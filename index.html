@@ -1019,8 +1019,11 @@
                 if (t) { player.x = t.barX; player.y = t.barY; }
             } else {
                 const ease = 1 - Math.pow(1 - player.catchProgress, 2);
+                const dist = Math.hypot(t.barX - player.catchStartX, t.barY - player.catchStartY);
+                // 残り区間を直線で滑らせず、ジャンプの弧の続きに見えるよう軽く弧を描かせる
+                const bulge = Math.min(36, dist * 0.3) * Math.sin(player.catchProgress * Math.PI);
                 player.x = player.catchStartX + (t.barX - player.catchStartX) * ease;
-                player.y = player.catchStartY + (t.barY - player.catchStartY) * ease;
+                player.y = player.catchStartY + (t.barY - player.catchStartY) * ease - bulge;
             }
             if (gameState === 'PLAYING') checkBananaCollision();
         } else if (player.state === 'FLYING' && gameState === 'PLAYING') {
@@ -1066,7 +1069,8 @@
                             chainAnchorIndex = bestMi;
                             chainTransition = { from: fromPositions, framesLeft: 14, total: 14 };
                         }
-                        player.x = bestPos.x; player.y = bestPos.y;
+                        // ここで player.x/y を書き換えない：今フレームまで描いていた放物線上の位置をそのまま
+                        // キャッチ開始位置として使うことで、瞬間的な横移動に見えないようにする。
                         player.state = 'CATCHING'; player.trapezeIndex = i;
                         player.catchStartX = player.x; player.catchStartY = player.y; player.catchProgress = 0;
                         player.catchFrames = Math.max(3, Math.min(14, Math.round(bestDist / 22)));

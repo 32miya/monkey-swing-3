@@ -1237,9 +1237,11 @@
 
     function drawVine(t) {
         const style = t.vineType;
+        // 切れるロープは通常より細く描画し、見た目で危険なロープだと分かるようにする
+        const ropeWidthMult = t.breakable ? 0.5 : 1;
         ctx.save();
         if (style === 'vine') {
-            ctx.strokeStyle = '#4a3218'; ctx.lineWidth = 7;
+            ctx.strokeStyle = '#4a3218'; ctx.lineWidth = 7 * ropeWidthMult;
             ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
             const leafN = 4;
             for (let i = 1; i <= leafN; i++) {
@@ -1251,16 +1253,16 @@
             }
         } else if (style === 'wire') {
             ctx.fillStyle = '#333'; ctx.fillRect(t.pivotX - 3, 0, 6, t.pivotY);
-            ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
+            ctx.strokeStyle = '#555'; ctx.lineWidth = 3 * ropeWidthMult;
             ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
         } else if (style === 'cable') {
             ctx.fillStyle = '#666'; ctx.fillRect(t.pivotX - 22, 0, 44, t.pivotY + 6);
-            ctx.strokeStyle = '#8899a5'; ctx.lineWidth = 5;
+            ctx.strokeStyle = '#8899a5'; ctx.lineWidth = 5 * ropeWidthMult;
             ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
         } else {
-            ctx.strokeStyle = '#b0b0b0'; ctx.lineWidth = 3; ctx.setLineDash([2, 4]);
+            ctx.strokeStyle = '#b0b0b0'; ctx.lineWidth = 3 * ropeWidthMult; ctx.setLineDash([2, 4]);
             ctx.beginPath(); ctx.moveTo(t.pivotX, 0); ctx.lineTo(t.pivotX, t.pivotY); ctx.stroke(); ctx.setLineDash([]);
-            ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 5;
+            ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 5 * ropeWidthMult;
             ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
         }
         ctx.restore();

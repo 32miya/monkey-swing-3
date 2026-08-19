@@ -1336,7 +1336,6 @@
         const accessory = opts.accessory || 0;
         const sizeMult = opts.sizeMult || 1;
         const alpha = opts.alpha != null ? opts.alpha : 1;
-        const swingPhase = opts.swingPhase || 0;
 
         ctx.save();
         ctx.globalAlpha = alpha;
@@ -1398,11 +1397,9 @@
         ctx.lineCap = 'round';
         ctx.beginPath();
         if (state === 'SWINGING') {
-            // 手はロープの支点に固定されたまま、脚は振り子の端に近いほど外側へ流れる（ブランコの脚の動き）
-            const kick = swingPhase * 18;
-            const stretch = Math.abs(swingPhase) * 7;
-            limbCurve(ctx, -5, 20, -5 + kick, 30 + stretch, -2 - kick * 0.12);
-            limbCurve(ctx, 5, 20, 5 + kick, 30 + stretch, 2 - kick * 0.12);
+            // 手（ロープの支点）から足まで、常に振り子の延長線上の一直線になるよう真っ直ぐ下に伸ばす
+            limbCurve(ctx, -5, 20, -5, 30, -2);
+            limbCurve(ctx, 5, 20, 5, 30, 2);
         }
         else if (state === 'FLYING_RISE') { limbCurve(ctx, -5, 18, -13, 33, -3); limbCurve(ctx, 5, 18, 15, 31, 3); }
         else if (state === 'FLYING_FALL') { limbCurve(ctx, -5, 18, 1, 27, -2); limbCurve(ctx, 5, 18, 9, 25, 2); }
@@ -1722,12 +1719,8 @@
 
         let drawState = 'SWINGING';
         let rot = 0;
-        let swingPhase = 0;
         if ((player.state === 'SWINGING' || player.state === 'CATCHING') && trapezes[player.trapezeIndex]) {
-            const curT = trapezes[player.trapezeIndex];
-            rot = curT.angleRad; drawState = 'SWINGING';
-            // 振り子の端（最大振れ角付近）に近いほど1に近づき、脚がブランコの先端のように外側へ流れる
-            swingPhase = Math.max(-1, Math.min(1, curT.angleDeg / MAX_SWING_ANGLE));
+            rot = trapezes[player.trapezeIndex].angleRad; drawState = 'SWINGING';
         } else if (player.state === 'ROPE_FALLING' || player.state === 'CROW_FALLING') {
             rot = Math.min(1.4, (player.fallVy || 0) * 0.12); drawState = 'FLYING';
         } else {
@@ -1750,8 +1743,8 @@
         drawChainRope();
         drawHangingChain(accessory);
         const anchorOpts = chainAnchorIndex === 0
-            ? { scaleX: player.scaleX, scaleY: player.scaleY, mood: player.mood, tailPhase: player.tailPhase, accessory, swingPhase }
-            : { scaleX: player.scaleX, scaleY: player.scaleY, mood: 'normal', tailPhase: player.tailPhase, sizeMult: 0.6, alpha: 0.95, swingPhase };
+            ? { scaleX: player.scaleX, scaleY: player.scaleY, mood: player.mood, tailPhase: player.tailPhase, accessory }
+            : { scaleX: player.scaleX, scaleY: player.scaleY, mood: 'normal', tailPhase: player.tailPhase, sizeMult: 0.6, alpha: 0.95 };
         drawMonkey(player.x, player.y, rot, drawState, isFlyingLike ? glow : null, anchorOpts);
 
         floatingTexts.forEach(ft => {

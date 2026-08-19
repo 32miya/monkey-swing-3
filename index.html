@@ -122,7 +122,6 @@
     }
     #story-caption .stage-name { color: #ffdd00; font-weight: bold; font-size: 13px; display:block; margin-bottom:4px; letter-spacing: 2px; }
 
-    .btn-container { display: flex; gap: 12px; margin-top: 12px; }
     .safe-area-padding-right { padding-right: env(safe-area-inset-right, 36px); }
 </style>
 </head>
@@ -175,9 +174,6 @@
                 <div id="new-best-badge" class="new-best hidden">🎉 自己ベスト更新！</div>
                 <div id="result-best" class="best-line"></div>
                 <button class="btn" onclick="resetGame(event)">もう一度遊ぶ</button>
-                <div class="btn-container">
-                    <button class="btn btn-small" onclick="shareScore(event)">📤 シェア</button>
-                </div>
                 <button class="btn btn-small" onclick="openAchievements(event)" style="margin-top:8px;">🏆 実績・記録</button>
             </div>
 
@@ -1844,12 +1840,6 @@
     window.addEventListener('touchstart', handleInput, { passive: false });
     window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleInput(e); });
 
-    window.shareScore = function(e) {
-        if (e) e.stopPropagation();
-        const text = `Monkey Swing 3 で ${score} 点を獲得！ジャングルから都市まで駆け抜けろ 🐒🏙️`;
-        if (navigator.share) navigator.share({ title: 'ゲーム結果', text, url: window.location.href }).catch(() => {});
-        else navigator.clipboard.writeText(text).then(() => alert('スコアをコピーしました！'));
-    };
     initGameData();
     updateTitleBest();
     loop();

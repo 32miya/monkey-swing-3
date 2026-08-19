@@ -177,7 +177,6 @@
                 <button class="btn" onclick="resetGame(event)">もう一度遊ぶ</button>
                 <div class="btn-container">
                     <button class="btn btn-small" onclick="shareScore(event)">📤 シェア</button>
-                    <button class="btn btn-small" onclick="takeScreenshot(event)">📸 スクショ保存</button>
                 </div>
                 <button class="btn btn-small" onclick="openAchievements(event)" style="margin-top:8px;">🏆 実績・記録</button>
             </div>
@@ -1315,7 +1314,17 @@
         });
     }
 
-    // ============ MONKEY (procedural) ============
+    // ============ MONKEY (procedural・アニメ調セルシェーディング) ============
+    // 手足を単純な直線ではなく、関節でわずかに曲げた曲線にして自然な動きに見せる
+    function limbCurve(ctx, x1, y1, x2, y2, bend) {
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.hypot(dx, dy) || 1;
+        const px = -dy / len, py = dx / len;
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(mx + px * bend, my + py * bend, x2, y2);
+    }
+
     function drawMonkey(x, y, rotation, state, comboGlow, opts) {
         opts = opts || {};
         const scaleX = opts.scaleX != null ? opts.scaleX : 1;
@@ -1347,51 +1356,75 @@
         // しっぽ（慣性で少し遅れて揺れる）
         const isFlyingPose = state === 'FLYING' || state === 'FLYING_RISE' || state === 'FLYING_FALL';
         const tailSway = Math.sin(tailPhase) * (isFlyingPose ? 10 : 5);
-        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+        ctx.lineCap = 'round';
         ctx.beginPath(); ctx.moveTo(-7, 7);
         if (state === 'FLYING_RISE') ctx.quadraticCurveTo(-30 + tailSway * 0.4, 14 + tailSway, -42 + tailSway * 0.6, 6 + tailSway * 0.6);
         else if (state === 'FLYING_FALL') ctx.quadraticCurveTo(-22 + tailSway * 0.3, -4 + tailSway, -30 + tailSway * 0.5, -14 + tailSway * 0.5);
         else if (isFlyingPose) ctx.quadraticCurveTo(-26 + tailSway * 0.3, 6 + tailSway, -36 + tailSway * 0.5, -2 + tailSway * 0.5);
         else if (state === 'ROLLING') ctx.quadraticCurveTo(-22, -16, -9, -28);
         else ctx.quadraticCurveTo(-18 + tailSway, 24, -5 + tailSway * 1.4, 36);
-        ctx.stroke();
+        ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 6.2; ctx.stroke();
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 4.2; ctx.stroke();
 
-        // 体（丸くぷっくり）
+        // 体（丸くぷっくり、アニメ調の縁取り＋陰影）
         ctx.fillStyle = '#9a6a35';
-        ctx.beginPath(); ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.save();
+        ctx.beginPath(); ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = 'rgba(50,28,8,0.22)';
+        ctx.beginPath(); ctx.ellipse(9, 10, 9, 16, 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
         ctx.fillStyle = '#F4C2C2';
         ctx.beginPath(); ctx.ellipse(0, 10, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(58,36,16,0.45)'; ctx.lineWidth = 1.2; ctx.stroke();
 
-        // 腕
-        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
+        // 腕（関節でわずかに曲げて自然な動きに、太い縁取り→細い毛色の二重ストロークでセル画風に）
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        if (state === 'SWINGING') { ctx.moveTo(-10, -8); ctx.lineTo(0, -38); ctx.moveTo(10, -8); ctx.lineTo(0, -38); }
-        else if (state === 'ROLLING') { ctx.moveTo(-10, -5); ctx.lineTo(-18, -18); ctx.moveTo(10, -5); ctx.lineTo(18, -18); }
-        else if (mood === 'perfect') { ctx.moveTo(-10, -6); ctx.lineTo(-20, -22); ctx.moveTo(10, -6); ctx.lineTo(20, -22); }
-        else if (state === 'FLYING_RISE') { ctx.moveTo(-10, -6); ctx.lineTo(-24, -26); ctx.moveTo(10, -6); ctx.lineTo(24, -26); }
-        else if (state === 'FLYING_FALL') { ctx.moveTo(-10, -6); ctx.lineTo(15, -3); ctx.moveTo(10, -6); ctx.lineTo(17, -12); }
-        else { ctx.moveTo(-10, -6); ctx.lineTo(11, -17); ctx.moveTo(10, -6); ctx.lineTo(11, -17); }
-        ctx.stroke();
+        if (state === 'SWINGING') { limbCurve(ctx, -10, -8, 0, -38, -3); limbCurve(ctx, 10, -8, 0, -38, 3); }
+        else if (state === 'ROLLING') { limbCurve(ctx, -10, -5, -18, -18, -3); limbCurve(ctx, 10, -5, 18, -18, 3); }
+        else if (mood === 'perfect') { limbCurve(ctx, -10, -6, -20, -22, -4); limbCurve(ctx, 10, -6, 20, -22, 4); }
+        else if (state === 'FLYING_RISE') { limbCurve(ctx, -10, -6, -24, -26, -4); limbCurve(ctx, 10, -6, 24, -26, 4); }
+        else if (state === 'FLYING_FALL') { limbCurve(ctx, -10, -6, 15, -3, -3); limbCurve(ctx, 10, -6, 17, -12, 3); }
+        else { limbCurve(ctx, -10, -6, 11, -17, -3); limbCurve(ctx, 10, -6, 11, -17, 3); }
+        ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 7.2; ctx.stroke();
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 5.2; ctx.stroke();
 
-        // 脚
+        // 脚（同じく関節を意識した曲線、二重ストロークで縁取り）
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        if (state === 'SWINGING') { ctx.moveTo(-5, 20); ctx.lineTo(-5, 30); ctx.moveTo(5, 20); ctx.lineTo(5, 30); }
-        else if (state === 'FLYING_RISE') { ctx.moveTo(-5, 18); ctx.lineTo(-13, 33); ctx.moveTo(5, 18); ctx.lineTo(15, 31); }
-        else if (state === 'FLYING_FALL') { ctx.moveTo(-5, 18); ctx.lineTo(1, 27); ctx.moveTo(5, 18); ctx.lineTo(9, 25); }
-        else { ctx.moveTo(-5, 18); ctx.lineTo(-15, 29); ctx.moveTo(5, 18); ctx.lineTo(-15, 29); }
-        ctx.stroke();
+        if (state === 'SWINGING') { limbCurve(ctx, -5, 20, -5, 30, -2); limbCurve(ctx, 5, 20, 5, 30, 2); }
+        else if (state === 'FLYING_RISE') { limbCurve(ctx, -5, 18, -13, 33, -3); limbCurve(ctx, 5, 18, 15, 31, 3); }
+        else if (state === 'FLYING_FALL') { limbCurve(ctx, -5, 18, 1, 27, -2); limbCurve(ctx, 5, 18, 9, 25, 2); }
+        else { limbCurve(ctx, -5, 18, -15, 29, -3); limbCurve(ctx, 5, 18, -15, 29, 3); }
+        ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 7.2; ctx.stroke();
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 5.2; ctx.stroke();
 
-        // 頭（大きめ・かわいい比率）
+        // 頭（大きめ・かわいい比率、アニメ調の縁取り＋陰影）
         ctx.save(); ctx.translate(0, -17);
-        ctx.fillStyle = '#9a6a35'; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#8B5A2B';
-        ctx.beginPath(); ctx.arc(-17, -3, 6.5, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(17, -3, 6.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#9a6a35'; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.save();
+        ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = 'rgba(50,28,8,0.2)';
+        ctx.beginPath(); ctx.ellipse(9, 2, 10, 14, 0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        // 頭のてっぺんの毛の房（アニメ風のはねっ毛）
+        ctx.fillStyle = '#9a6a35'; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-3, -17); ctx.quadraticCurveTo(-1, -26, 3, -18);
+        ctx.quadraticCurveTo(5, -25, 9, -16);
+        ctx.lineTo(2, -13); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#8B5A2B'; ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 1.8;
+        ctx.beginPath(); ctx.arc(-17, -3, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(17, -3, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
         ctx.fillStyle = '#F4C2C2';
         ctx.beginPath(); ctx.arc(-17, -3, 3.2, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(17, -3, 3.2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#F4C2C2';
-        ctx.beginPath(); ctx.ellipse(0, 4, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F4C2C2'; ctx.strokeStyle = 'rgba(58,36,16,0.4)'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.ellipse(0, 4, 13, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
         // 頬っぺた（常に少し赤い、食べ中はぷっくり）
         ctx.fillStyle = 'rgba(255,120,140,0.55)';
@@ -1427,13 +1460,25 @@
             ctx.beginPath(); ctx.arc(-4, -1, 1.8, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(4, -1, 1.8, 0, Math.PI * 2); ctx.fill();
         } else {
-            ctx.fillStyle = 'black';
-            const eyeSize = mood === 'charging' ? 2.6 : 2.2;
-            ctx.beginPath(); ctx.arc(-4, -1, eyeSize, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(4, -1, eyeSize, 0, Math.PI * 2); ctx.fill();
+            // アニメ風の「キラキラ目」：白目＋虹彩＋瞳孔＋二重ハイライト＋まぶたのライン
+            const eyeSize = mood === 'charging' ? 3.0 : 2.6;
             ctx.fillStyle = 'white';
-            ctx.beginPath(); ctx.arc(-4.9, -1.9, 0.9, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(3.1, -1.9, 0.9, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-4, -1, eyeSize + 0.6, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -1, eyeSize + 0.6, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#4a2c12';
+            ctx.beginPath(); ctx.arc(-4, -0.7, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -0.7, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'black';
+            ctx.beginPath(); ctx.arc(-4, -0.5, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -0.5, eyeSize * 0.55, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(-4, -1, eyeSize + 0.6, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+            ctx.beginPath(); ctx.arc(4, -1, eyeSize + 0.6, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-5.2, -2.1, 1.1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(2.8, -2.1, 1.1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-3.2, 0.2, 0.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4.8, 0.2, 0.5, 0, Math.PI * 2); ctx.fill();
         }
 
         ctx.fillStyle = '#7a4a20'; ctx.beginPath(); ctx.ellipse(0, 2.5, 1.6, 1.1, 0, 0, Math.PI * 2); ctx.fill();
@@ -1727,9 +1772,20 @@
 
     function loop() { if (!isPaused) update(); draw(); requestAnimationFrame(loop); }
 
+    let lastInputTime = 0;
+    let lastInputType = null;
     function handleInput(e) {
-        if (gameState !== 'PLAYING' || isPaused) return;
         if (e.target && e.target.closest && (e.target.closest('.screen') || e.target.id === 'mute-btn' || e.target.id === 'pause-btn')) return;
+        // マルチタッチ（2本目以降の指）は無視し、最初の1本のタップだけを操作として扱う
+        if (e.touches && e.touches.length > 1) return;
+        if (e.cancelable) e.preventDefault();
+        // タッチ操作の直後にブラウザが発火する合成マウスイベント(mousedown/click)による二重入力を無視する
+        const now = performance.now();
+        if (e.type === 'mousedown' && lastInputType === 'touchstart' && now - lastInputTime < 800) return;
+        // 端末によっては1回のタップで touchstart が連続発火することがあるため、ごく短時間の重複入力も無視する
+        if (now - lastInputTime < 80) return;
+        lastInputTime = now; lastInputType = e.type;
+        if (gameState !== 'PLAYING' || isPaused) return;
         if (player.state === 'SWINGING') {
             const t = trapezes[player.trapezeIndex];
             const releaseAngleDeg = t.angleDeg;
@@ -1794,16 +1850,6 @@
         if (navigator.share) navigator.share({ title: 'ゲーム結果', text, url: window.location.href }).catch(() => {});
         else navigator.clipboard.writeText(text).then(() => alert('スコアをコピーしました！'));
     };
-    window.takeScreenshot = function(e) {
-        if (e) e.stopPropagation();
-        try {
-            const link = document.createElement('a');
-            link.download = `monkey_swing3_score_${score}.png`;
-            link.href = canvas.toDataURL('image/png');
-            document.body.appendChild(link); link.click(); document.body.removeChild(link);
-        } catch (err) { alert('保存に失敗しました。'); }
-    };
-
     initGameData();
     updateTitleBest();
     loop();

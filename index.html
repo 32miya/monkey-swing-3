@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Monkey Swing 3 - 都市への逃走</title>
+<style>
+    html, body {
+        overscroll-behavior: none;
+    }
+    body {
+        margin: 0; padding: 0; background-color: #000; overflow: hidden;
+        font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+        touch-action: none; user-select: none; -webkit-user-select: none;
+        width: 100vw; height: 100vh;
+        position: fixed; top: 0; left: 0;
+    }
+
+    #orientation-wrapper {
+        position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+        transform-origin: top left; overflow: hidden; background-color: #000;
+    }
+
+    #game-container { position: relative; width: 100%; height: 100%; }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    #ui-layer { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    .hidden { display: none !important; }
+
+    .screen {
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        background: linear-gradient(rgba(10,20,10,0.55), rgba(10,10,20,0.75));
+        color: white; pointer-events: auto;
+    }
+
+    h1 { font-size: 30px; text-shadow: 2px 2px 0px #000; margin: 0 0 4px 0; text-align: center; letter-spacing: 1px; }
+    .version { font-size: 13px; color: #ccc; margin-bottom: 16px; text-shadow: 1px 1px 2px #000; }
+    .lead { font-size: 13px; color: #9de89d; margin-bottom: 10px; text-align:center; }
+
+    .btn {
+        background: linear-gradient(to bottom, #ff9900, #ff5500); border: 3px solid #fff;
+        border-radius: 30px; color: white; font-size: 20px; font-weight: bold;
+        padding: 14px 38px; margin: 8px; cursor: pointer; pointer-events: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn-small { font-size: 15px; padding: 9px 18px; background: linear-gradient(to bottom, #4facfe, #00f2fe); }
+
+    #hud {
+        position: absolute; top: 16px; right: 76px; font-size: 24px;
+        font-weight: bold; color: white; text-shadow: 2px 2px 4px #000; pointer-events: none;
+        display: flex; flex-direction: column; align-items: flex-end;
+    }
+    #combo-display { font-size: 18px; color: #ffdd00; height: 22px; transition: transform 0.1s; }
+    #chain-display { font-size: 14px; color: #7CFC00; margin-top: 2px; }
+
+    .best-line { font-size: 13px; color: #bde; margin: 4px 0 10px; text-align: center; }
+    .new-best { font-size: 16px; color: #ffdd00; font-weight: bold; margin: 4px 0; animation: pulseBest 0.6s ease-in-out infinite alternate; }
+    @keyframes pulseBest { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+    .stats-summary {
+        font-size: 13px; color: #dff; background: rgba(255,255,255,0.08); border-radius: 10px;
+        padding: 10px 14px; margin-bottom: 10px; text-align: left; line-height: 1.7; width: 85%; max-width: 320px;
+    }
+    .achievements-list {
+        width: 85%; max-width: 320px; max-height: 32vh; overflow-y: auto;
+        display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px;
+    }
+    .ach-item {
+        display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.06);
+        border-radius: 8px; padding: 8px 10px; text-align: left; font-size: 12px; opacity: 0.55;
+    }
+    .ach-item.unlocked { opacity: 1; background: rgba(255,221,0,0.14); border: 1px solid rgba(255,221,0,0.4); }
+    .ach-icon { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+    .ach-text { flex: 1; }
+    .ach-name { font-weight: bold; color: #ffdd00; }
+    .ach-item:not(.unlocked) .ach-name { color: #ccc; }
+    .ach-desc { font-size: 11px; color: #cde; opacity: 0.85; }
+
+    .achievement-toast {
+        position: absolute; top: 18%; left: 50%; transform: translate(-50%, 0);
+        background: rgba(20,20,30,0.92); border: 2px solid #ffdd00; border-radius: 12px;
+        padding: 10px 18px; color: #fff; font-size: 14px; text-align: center; pointer-events: none;
+        opacity: 0; transition: opacity 0.4s, transform 0.4s; z-index: 30; white-space: nowrap;
+    }
+    .achievement-toast.show { opacity: 1; transform: translate(-50%, 8px); }
+    #stage-display { font-size: 13px; color: #bde; opacity: 0.85; margin-top: 2px; }
+
+    #aim-display {
+        position: absolute; top: 16px; left: 16px; font-size: 13px; font-weight: bold;
+        color: #fff; text-shadow: 1px 1px 3px #000; pointer-events: none;
+        background: rgba(0,0,0,0.35); padding: 5px 10px; border-radius: 8px;
+    }
+
+    #mute-btn {
+        position: absolute; bottom: 24px; right: 76px; width: 46px; height: 46px;
+        background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 50%;
+        color: white; font-size: 22px; display: flex; justify-content: center; align-items: center;
+        cursor: pointer; pointer-events: auto; z-index: 20;
+    }
+    #pause-btn {
+        position: absolute; bottom: 24px; right: 132px; width: 46px; height: 46px;
+        background: rgba(0,0,0,0.5); border: 2px solid white; border-radius: 50%;
+        color: white; font-size: 20px; display: flex; justify-content: center; align-items: center;
+        cursor: pointer; pointer-events: auto; z-index: 20;
+    }
+    #pauseScreen .btn { width: auto; min-width: 200px; }
+
+    .instructions {
+        position: absolute; top: 16px; right: 16px; margin: 0; text-align: left; font-size: 13px;
+        line-height: 1.5; background: rgba(0,0,0,0.6); padding: 12px 14px; border-radius: 10px;
+        max-width: 230px; pointer-events: none; border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    #story-caption {
+        position: absolute; top: 12%; left: 50%; transform: translate(-50%, 0);
+        background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.25);
+        border-radius: 10px; padding: 10px 20px; color: #fff; text-align: center;
+        font-size: 15px; line-height: 1.6; white-space: pre-line; pointer-events: none;
+        opacity: 0; transition: opacity 0.8s; max-width: 80%;
+    }
+    #story-caption .stage-name { color: #ffdd00; font-weight: bold; font-size: 13px; display:block; margin-bottom:4px; letter-spacing: 2px; }
+
+    .btn-container { display: flex; gap: 12px; margin-top: 12px; }
+    .safe-area-padding-right { padding-right: env(safe-area-inset-right, 36px); }
+</style>
+</head>
+<body>
+
+<div id="orientation-wrapper">
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui-layer">
+            <div id="hud" class="safe-area-padding-right">
+                <div>Score: <span id="score">0</span></div>
+                <div id="combo-display"></div>
+                <div id="chain-display"></div>
+                <div id="stage-display"></div>
+            </div>
+
+            <div id="aim-display" class="hidden">照準: <span id="aim-text">-</span></div>
+
+            <div id="pause-btn" class="hidden" onclick="togglePause(event)">⏸️</div>
+            <div id="mute-btn" onclick="toggleMute(event)">🎵</div>
+            <div id="story-caption"><span class="stage-name" id="story-stage"></span><span id="story-text"></span></div>
+
+            <div id="pauseScreen" class="screen hidden">
+                <h1>PAUSE</h1>
+                <button class="btn" onclick="togglePause(event)">▶️ 再開する</button>
+            </div>
+
+            <div id="titleScreen" class="screen">
+                <div class="instructions safe-area-padding-right">
+                    画面タップでジャンプ！<br>
+                    スイング中は点線の着地予測が出るよ。<br>
+                    <span style="color:#7CFC00">緑</span>=届く　<span style="color:#ffdd00">黄</span>=ギリギリ　<span style="color:#ff6666">赤</span>=届かない<br>
+                    空中でもう一度タップで2段ジャンプ！<br>
+                    進むほど仲間が増え、バナナ得点も最大5倍に！<br>
+                    <span style="color:#ff6666">カラス</span>が仲間を襲う。先頭が切り離されたらゲームオーバー！<br>
+                    赤く点滅するロープは3秒で切れる。切れても慌てずタップで脱出！
+                </div>
+                <h1>MONKEY SWING 3</h1>
+                <div class="lead">～ ジャングルから、都市へ ～</div>
+                <div id="title-best" class="best-line"></div>
+                <button class="btn" onclick="startGame(event)">GAME START</button>
+                <button class="btn btn-small" onclick="openAchievements(event)">🏆 実績・記録</button>
+                <div class="version">ver 3.0</div>
+            </div>
+
+            <div id="resultScreen" class="screen hidden">
+                <h1>GAME OVER</h1>
+                <div style="font-size: 22px; margin: 6px 0;" id="stageReached"></div>
+                <div style="font-size: 22px; margin: 10px 0;">最終スコア: <span id="finalScore" style="font-size: 38px; color: #ffdd00;">0</span></div>
+                <div id="new-best-badge" class="new-best hidden">🎉 自己ベスト更新！</div>
+                <div id="result-best" class="best-line"></div>
+                <button class="btn" onclick="resetGame(event)">もう一度遊ぶ</button>
+                <div class="btn-container">
+                    <button class="btn btn-small" onclick="shareScore(event)">📤 シェア</button>
+                    <button class="btn btn-small" onclick="takeScreenshot(event)">📸 スクショ保存</button>
+                </div>
+                <button class="btn btn-small" onclick="openAchievements(event)" style="margin-top:8px;">🏆 実績・記録</button>
+            </div>
+
+            <div id="achievementsScreen" class="screen hidden">
+                <h1 style="font-size:24px;">🏆 実績・記録</h1>
+                <div id="stats-summary" class="stats-summary"></div>
+                <div id="achievements-list" class="achievements-list"></div>
+                <button class="btn" onclick="closeAchievements(event)">もどる</button>
+            </div>
+
+            <div id="achievement-toast" class="achievement-toast hidden"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const wrapper = document.getElementById('orientation-wrapper');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let scale = 1;
+    const VIRTUAL_HEIGHT = 800;
+    const GROUND_LEVEL = VIRTUAL_HEIGHT - 100;
+
+    let gameWidth = 0, gameHeight = 0;
+
+    function resizeCanvas() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+
+        if (h > w) {
+            wrapper.style.width = h + 'px'; wrapper.style.height = w + 'px';
+            wrapper.style.transform = `rotate(-90deg) translateX(-${h}px)`;
+            gameWidth = h; gameHeight = w;
+        } else {
+            wrapper.style.width = w + 'px'; wrapper.style.height = h + 'px';
+            wrapper.style.transform = 'none';
+            gameWidth = w; gameHeight = h;
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = gameWidth * dpr; canvas.height = gameHeight * dpr;
+        scale = canvas.height / VIRTUAL_HEIGHT;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ============ 記録・実績（このセッション内のみ・保存しない） ============
+    // ブラウザを開いている間（起動中）だけトロフィーや自己ベストを保持し、
+    // 次回起動（リロード）時には必ずリセットされる仕様。localStorage等の永続化は行わない。
+    function defaultStats() {
+        return { totalPlays: 0, totalDistance: 0, bestScore: 0, bestDistance: 0, bestChain: 1, achievements: {} };
+    }
+    let STATS = defaultStats();
+    function saveStats() { /* あえて何もしない：次回起動時はリセットされる仕様 */ }
+
+    const ACHIEVEMENTS = [
+        { id: 'first_play', icon: '🐒', name: 'はじめの一歩', desc: '群れを離れ、初めてジャングルへ飛び出す' },
+        { id: 'big_troop', icon: '👨‍👩‍👧‍👦', name: '大所帯', desc: '仲間を5匹編成にする（バナナ5倍！）' },
+        { id: 'city_ruler', icon: '🏙️', name: '都市の支配者', desc: '最終エリア「猿の惑星」に到達する' },
+        { id: 'close_call', icon: '💦', name: '危機一髪', desc: '切れたロープからジャンプで脱出する' },
+        { id: 'legendary_score', icon: '👑', name: '伝説の得点', desc: '1回のプレイで5000点以上を獲得する' },
+        { id: 'marathon', icon: '🏃', name: 'マラソンモンキー', desc: '累計移動距離5000mを達成する' },
+        { id: 'crow_free', icon: '🍃', name: '無傷の逃走', desc: 'カラスに一度もやられず300m以上進む' },
+        { id: 'high_flyer', icon: '⭐', name: '伝説の旅', desc: '1回のプレイで1500m以上進む' }
+    ];
+
+    function unlockAchievement(id) {
+        if (STATS.achievements[id]) return;
+        STATS.achievements[id] = true;
+        saveStats();
+        const def = ACHIEVEMENTS.find(a => a.id === id);
+        if (def) showAchievementToast(def);
+    }
+
+    let achievementToastTimer = null;
+    function showAchievementToast(def) {
+        const el = document.getElementById('achievement-toast');
+        el.innerText = `${def.icon} 実績解除：${def.name}`;
+        el.classList.remove('hidden');
+        requestAnimationFrame(() => el.classList.add('show'));
+        if (achievementToastTimer) clearTimeout(achievementToastTimer);
+        achievementToastTimer = setTimeout(() => {
+            el.classList.remove('show');
+            setTimeout(() => el.classList.add('hidden'), 400);
+        }, 2600);
+    }
+
+    function updateTitleBest() {
+        const el = document.getElementById('title-best');
+        if (STATS.totalPlays === 0) { el.innerText = ''; return; }
+        el.innerText = `自己ベスト: ${STATS.bestScore}点 / ${STATS.bestDistance}m`;
+    }
+
+    window.openAchievements = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('titleScreen').classList.add('hidden');
+        document.getElementById('resultScreen').classList.add('hidden');
+        const summary = document.getElementById('stats-summary');
+        summary.innerHTML = `
+            自己ベストスコア: <b>${STATS.bestScore}</b> 点<br>
+            自己ベスト距離: <b>${STATS.bestDistance}</b> m<br>
+            最大編成: <b>${STATS.bestChain}</b> 匹<br>
+            累計移動距離: <b>${Math.floor(STATS.totalDistance)}</b> m<br>
+            プレイ回数: <b>${STATS.totalPlays}</b> 回
+        `;
+        const list = document.getElementById('achievements-list');
+        list.innerHTML = ACHIEVEMENTS.map(a => {
+            const unlocked = !!STATS.achievements[a.id];
+            return `<div class="ach-item${unlocked ? ' unlocked' : ''}">
+                <div class="ach-icon">${unlocked ? a.icon : '🔒'}</div>
+                <div class="ach-text"><div class="ach-name">${a.name}</div><div class="ach-desc">${a.desc}</div></div>
+            </div>`;
+        }).join('');
+        document.getElementById('achievementsScreen').classList.remove('hidden');
+    };
+    window.closeAchievements = function (e) {
+        if (e) e.stopPropagation();
+        document.getElementById('achievementsScreen').classList.add('hidden');
+        if (gameState === 'GAMEOVER') document.getElementById('resultScreen').classList.remove('hidden');
+        else document.getElementById('titleScreen').classList.remove('hidden');
+    };
+
+    // ============ AUDIO ============
+    let isMuted = false;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let ambientOsc = null, ambientFilter = null, ambientGain = null;
+
+    function startAmbient() {
+        if (ambientOsc) return;
+        ambientOsc = audioCtx.createOscillator();
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        ambientFilter = audioCtx.createBiquadFilter();
+        ambientGain = audioCtx.createGain();
+
+        ambientOsc.type = 'sawtooth';
+        ambientOsc.frequency.value = 60;
+        ambientFilter.type = 'lowpass';
+        ambientFilter.frequency.value = 200;
+        ambientGain.gain.value = isMuted ? 0 : 0.025;
+
+        lfo.frequency.value = 0.15;
+        lfoGain.gain.value = 30;
+        lfo.connect(lfoGain); lfoGain.connect(ambientFilter.frequency);
+
+        ambientOsc.connect(ambientFilter); ambientFilter.connect(ambientGain); ambientGain.connect(audioCtx.destination);
+        ambientOsc.start(); lfo.start();
+    }
+
+    function updateAmbient(progress) {
+        if (!ambientFilter) return;
+        const targetFreq = 200 + progress * 500;
+        ambientFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 1.5);
+        updateBGM(progress);
+    }
+
+    // ============ BGM（Monkey Swing 2 のBGMを参考に、外部音源を使わず自前で作曲したループ） ============
+    let bgmGain = null, bgmFilter = null, bgmTimer = null;
+    let bgmNextTime = 0, bgmStep = 0;
+    const BGM_BPM = 108;
+    const BGM_STEP_SEC = 60 / BGM_BPM / 2;
+    const BGM_ROOT = 220; // A3
+    // マイナーペンタトニック（ジャングル〜冒険っぽい響き）のシンプルなループ
+    const BGM_LEAD = [0, 3, 5, 7, 10, 7, 5, 3, 0, 3, 7, 10, 12, 10, 7, 3];
+    const BGM_BASS = [0, 0, 5, 5, 3, 3, 7, 7, 0, 0, 5, 5, 3, 3, 7, 7];
+    function bgmNoteFreq(semi) { return BGM_ROOT * Math.pow(2, semi / 12); }
+
+    function startBGM() {
+        if (bgmGain) return;
+        bgmFilter = audioCtx.createBiquadFilter();
+        bgmFilter.type = 'lowpass'; bgmFilter.frequency.value = 1600;
+        bgmGain = audioCtx.createGain();
+        bgmGain.gain.value = isMuted ? 0 : 0.09;
+        bgmFilter.connect(bgmGain); bgmGain.connect(audioCtx.destination);
+        bgmNextTime = audioCtx.currentTime + 0.1;
+        bgmStep = 0;
+        scheduleBGM();
+    }
+
+    function scheduleBGM() {
+        while (bgmNextTime < audioCtx.currentTime + 0.2) {
+            playBGMStep(bgmStep, bgmNextTime);
+            bgmNextTime += BGM_STEP_SEC;
+            bgmStep = (bgmStep + 1) % BGM_LEAD.length;
+        }
+        bgmTimer = setTimeout(scheduleBGM, 50);
+    }
+
+    function playBGMStep(step, t) {
+        // リード（メロディ）：軽やかに、1拍おき
+        if (step % 2 === 0) {
+            const lead = audioCtx.createOscillator();
+            const leadGain = audioCtx.createGain();
+            lead.type = 'triangle';
+            lead.frequency.value = bgmNoteFreq(BGM_LEAD[step] + 12);
+            leadGain.gain.setValueAtTime(0, t);
+            leadGain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+            leadGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 1.8);
+            lead.connect(leadGain); leadGain.connect(bgmFilter);
+            lead.start(t); lead.stop(t + BGM_STEP_SEC * 2);
+        }
+        // ベース：土台のリズム、4拍おき
+        if (step % 4 === 0) {
+            const bass = audioCtx.createOscillator();
+            const bassGain = audioCtx.createGain();
+            bass.type = 'sine';
+            bass.frequency.value = bgmNoteFreq(BGM_BASS[step] - 12);
+            bassGain.gain.setValueAtTime(0, t);
+            bassGain.gain.linearRampToValueAtTime(0.6, t + 0.02);
+            bassGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 3.6);
+            bass.connect(bassGain); bassGain.connect(bgmFilter);
+            bass.start(t); bass.stop(t + BGM_STEP_SEC * 4);
+        }
+    }
+
+    function updateBGM(progress) {
+        if (!bgmFilter) return;
+        // ジャングルは丸く柔らかい音色、都市に進むほど明るく開けた音色へ
+        const targetFreq = 1200 + progress * 1800;
+        bgmFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 2.0);
+    }
+
+    // 落下してゲームオーバーになる瞬間、BGM・環境音を止めて「残念な」静けさを演出する
+    function stopBGM() {
+        if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+        if (bgmGain) { bgmGain.gain.cancelScheduledValues(audioCtx.currentTime); bgmGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
+        bgmGain = null; bgmFilter = null;
+    }
+    function stopAmbient() {
+        if (ambientGain) { ambientGain.gain.cancelScheduledValues(audioCtx.currentTime); ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
+        ambientOsc = null; ambientFilter = null; ambientGain = null;
+    }
+
+    function playSound(type) {
+        if (isMuted) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'jump') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+            gainNode.gain.setValueAtTime(0.3, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'banana') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(800, now); osc.frequency.setValueAtTime(1200, now + 0.05);
+            gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.start(now); osc.stop(now + 0.15);
+        } else if (type === 'golden') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(800, now + 0.05);
+            osc.frequency.setValueAtTime(1200, now + 0.1); osc.frequency.setValueAtTime(1600, now + 0.15);
+            gainNode.gain.setValueAtTime(0.3, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4);
+        } else if (type === 'perfect') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(900, now); osc.frequency.setValueAtTime(1300, now + 0.06);
+            gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'fall') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.6);
+            gainNode.gain.setValueAtTime(0.4, now); gainNode.gain.linearRampToValueAtTime(0.1, now + 0.5);
+            osc.start(now); osc.stop(now + 0.6);
+
+            const impactOsc = audioCtx.createOscillator(); const impactGain = audioCtx.createGain();
+            impactOsc.connect(impactGain); impactGain.connect(audioCtx.destination);
+            impactOsc.type = 'square'; impactOsc.frequency.setValueAtTime(100, now + 0.6); impactOsc.frequency.exponentialRampToValueAtTime(10, now + 0.8);
+            impactGain.gain.setValueAtTime(0, now); impactGain.gain.setValueAtTime(0.5, now + 0.6); impactGain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+            impactOsc.start(now + 0.6); impactOsc.stop(now + 0.8);
+        } else if (type === 'grabVine') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(500, now); osc.frequency.exponentialRampToValueAtTime(350, now + 0.1);
+            gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+            osc.start(now); osc.stop(now + 0.12);
+        } else if (type === 'grabWire') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(1800, now); osc.frequency.exponentialRampToValueAtTime(2600, now + 0.04);
+            gainNode.gain.setValueAtTime(0.08, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+            osc.start(now); osc.stop(now + 0.06);
+        } else if (type === 'grabCable') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(90, now + 0.15);
+            gainNode.gain.setValueAtTime(0.15, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+            osc.start(now); osc.stop(now + 0.18);
+        } else if (type === 'grabCrane') {
+            osc.type = 'square'; osc.frequency.setValueAtTime(220, now); osc.frequency.setValueAtTime(180, now + 0.05);
+            gainNode.gain.setValueAtTime(0.22, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'recruit') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(700, now); osc.frequency.setValueAtTime(1000, now + 0.08); osc.frequency.setValueAtTime(1300, now + 0.16);
+            gainNode.gain.setValueAtTime(0.2, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.start(now); osc.stop(now + 0.3);
+        }
+    }
+
+    function playGrabSound(vineType) {
+        if (vineType === 'wire') playSound('grabWire');
+        else if (vineType === 'cable') playSound('grabCable');
+        else if (vineType === 'crane') playSound('grabCrane');
+        else playSound('grabVine');
+    }
+
+    function spawnGrabParticles(t) {
+        const palette = { vine: '#7CFC00', wire: '#fff28a', cable: '#c9d6e0', crane: '#e0824a' }[t.vineType] || '#ffffff';
+        const n = t.vineType === 'wire' ? 6 : 4;
+        for (let i = 0; i < n; i++) {
+            trailParticles.push({ x: t.barX, y: t.barY, vx: (Math.random() - 0.5) * 4, vy: (Math.random() - 0.5) * 4 - 1, size: 2 + Math.random() * 3, color: palette, life: 1.0, decay: 0.06 + Math.random() * 0.06 });
+        }
+    }
+
+    window.toggleMute = function(e) {
+        if (e) e.stopPropagation();
+        isMuted = !isMuted;
+        if (ambientGain) ambientGain.gain.setTargetAtTime(isMuted ? 0 : 0.025, audioCtx.currentTime, 0.2);
+        if (bgmGain) bgmGain.gain.setTargetAtTime(isMuted ? 0 : 0.09, audioCtx.currentTime, 0.2);
+        document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🎵";
+    };
+
+    window.togglePause = function (e) {
+        if (e) e.stopPropagation();
+        if (gameState !== 'PLAYING' && !isPaused) return;
+        isPaused = !isPaused;
+        if (isPaused) {
+            audioCtx.suspend();
+            document.getElementById('pauseScreen').classList.remove('hidden');
+            document.getElementById('pause-btn').innerText = '▶️';
+        } else {
+            audioCtx.resume();
+            document.getElementById('pauseScreen').classList.add('hidden');
+            document.getElementById('pause-btn').innerText = '⏸️';
+        }
+    };
+
+    // ============ STAGES (jungle -> city) ============
+    const STAGES = [
+        { minM: 0,    name: 'ジャングル深部', vine: 'vine',
+          story: '群れを離れた一匹の猿がいた。\n自由を求め、深いジャングルを飛び出す。' },
+        { minM: 250,  name: 'ジャングルの外れ', vine: 'vine',
+          story: '木々の隙間から、遠くにかすかな灯りが見える。\n人間の気配がする方角へ。' },
+        { minM: 550,  name: '郊外', vine: 'wire',
+          story: '電線が、森の蔓の代わりになった。\nここから先は人間の縄張りだ。' },
+        { minM: 950,  name: '市街地入口', vine: 'cable',
+          story: '建物が増えてきた。クレーンのワイヤーが新しい枝だ。' },
+        { minM: 1500, name: '都市中心部', vine: 'crane',
+          story: '見上げるビルの谷間。\n猿は空を飛び、人間は地上を歩いている。' },
+        { minM: 2300, name: '猿の惑星', vine: 'crane',
+          story: '気づけば、屋上という屋上に猿の旗が立っていた。\nこの街は、もう猿の楽園だ。' }
+    ];
+
+    function getStageBlend(distM) {
+        for (let i = STAGES.length - 1; i >= 0; i--) {
+            if (distM >= STAGES[i].minM) {
+                const next = STAGES[i + 1] || STAGES[i];
+                const span = Math.max(1, next.minM - STAGES[i].minM);
+                const t = next === STAGES[i] ? 0 : Math.min(1, (distM - STAGES[i].minM) / span);
+                return { cur: STAGES[i], next: next, t: t, idx: i, progress: i + t };
+            }
+        }
+        return { cur: STAGES[0], next: STAGES[0], t: 0, idx: 0, progress: 0 };
+    }
+
+    const shownStages = new Set();
+    let captionTimer = null;
+    function showStoryCaption(stage) {
+        const panel = document.getElementById('story-caption');
+        document.getElementById('story-stage').innerText = stage.name;
+        document.getElementById('story-text').innerText = stage.story;
+        panel.style.opacity = '1';
+        if (captionTimer) clearTimeout(captionTimer);
+        captionTimer = setTimeout(() => { panel.style.opacity = '0'; }, 4200);
+    }
+
+    function hash1(n) {
+        const x = Math.sin(n * 12.9898) * 43758.5453;
+        return x - Math.floor(x);
+    }
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerpColor(c1, c2, t) { return [Math.round(lerp(c1[0], c2[0], t)), Math.round(lerp(c1[1], c2[1], t)), Math.round(lerp(c1[2], c2[2], t))]; }
+    function rgb(c) { return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+    // ============ GAME CONSTANTS ============
+    const MAX_SWING_ANGLE = 60.0, BASE_DISTANCE = 100, BONUS_DISTANCE = 250, DOUBLE_JUMP_DISTANCE = 250;
+    const DEG_TO_RAD = Math.PI / 180, CATCH_RADIUS = 250, MONKEY_SIZE = 60, TRAPEZE_PIVOT_Y = 50;
+
+    let gameState = 'TITLE';
+    let isPaused = false;
+    let score = 0, distanceScore = 0, cameraX = 0;
+    let trapezes = [], bananas = [], floatingTexts = [], stars = [], trailParticles = [];
+    let player = { x: 0, y: 0, state: 'SWINGING', trapezeIndex: 0, flightStartX: 0, flightStartY: 0, flightTargetX: 0, flightTargetY: 0, flightProgress: 0, flightSpeed: 0.03, canDoubleJump: false, hasDoubleJumped: false, rollAngle: 0, lastY: 0, combo: 0 };
+
+    // ============ 仲間の群れ（チェーン方式） ============
+    // chain[0] = 先頭（プレイヤー本体）, chain[1..followerCount] = 仲間。
+    // chainAnchorIndex は「今ロープを掴んでいる個体」。それ以外は前後にV字で垂れ下がる。
+    const FOLLOWER_MILESTONES = [80, 250, 500, 850, 1300];
+    let followerCount = 0;
+    let chainAnchorIndex = 0;
+
+    // ============ 仲間チェーンの振り子シミュレーション ============
+    // アンカー（今ロープを掴んでいる個体）を起点に、各リンクがバネ・減衰で
+    // 一つ前のリンクの角度を追いかける実際の振り子連結として動かす。
+    const CHAIN_LINK_LEN = 30;
+    let chainLinkAngle = {};   // memberIndex -> 角度(rad)
+    let chainLinkAngleVel = {}; // memberIndex -> 角速度
+    let chainPosCache = { 0: { x: 0, y: 0 } };
+
+    function updateChainPendulum() {
+        if (followerCount <= 0) { chainLinkAngle = {}; chainLinkAngleVel = {}; chainPosCache = { 0: { x: player.x, y: player.y } }; return; }
+
+        const onRope = (player.state === 'SWINGING' || player.state === 'CATCHING') && trapezes[player.trapezeIndex];
+        const anchorAngle = onRope ? trapezes[player.trapezeIndex].angleRad : (chainLinkAngle[chainAnchorIndex] || 0) * 0.97;
+        chainLinkAngle[chainAnchorIndex] = anchorAngle;
+        chainLinkAngleVel[chainAnchorIndex] = 0;
+
+        const STIFF = 0.05, DAMP = 0.83, LEAN = 0.22;
+        let prev = anchorAngle;
+        for (let i = chainAnchorIndex - 1; i >= 0; i--) {
+            prev = stepChainLink(i, prev + LEAN, STIFF, DAMP);
+        }
+        prev = anchorAngle;
+        for (let i = chainAnchorIndex + 1; i <= followerCount; i++) {
+            prev = stepChainLink(i, prev - LEAN, STIFF, DAMP);
+        }
+
+        // 位置はアンカーから外側へ、しっぽの長さ分だけ角度方向に積み上げていく
+        const pos = { [chainAnchorIndex]: { x: player.x, y: player.y } };
+        let cur = pos[chainAnchorIndex];
+        for (let i = chainAnchorIndex - 1; i >= 0; i--) {
+            const a = chainLinkAngle[i];
+            cur = { x: cur.x + CHAIN_LINK_LEN * Math.sin(a), y: cur.y + CHAIN_LINK_LEN * Math.cos(a) };
+            pos[i] = cur;
+        }
+        cur = pos[chainAnchorIndex];
+        for (let i = chainAnchorIndex + 1; i <= followerCount; i++) {
+            const a = chainLinkAngle[i];
+            cur = { x: cur.x + CHAIN_LINK_LEN * Math.sin(a), y: cur.y + CHAIN_LINK_LEN * Math.cos(a) };
+            pos[i] = cur;
+        }
+        chainPosCache = pos;
+    }
+
+    function stepChainLink(i, target, stiff, damp) {
+        if (chainLinkAngle[i] === undefined) chainLinkAngle[i] = target;
+        if (chainLinkAngleVel[i] === undefined) chainLinkAngleVel[i] = 0;
+        const accel = (target - chainLinkAngle[i]) * stiff;
+        chainLinkAngleVel[i] = (chainLinkAngleVel[i] + accel) * damp;
+        chainLinkAngle[i] += chainLinkAngleVel[i];
+        return chainLinkAngle[i];
+    }
+
+    function chainMemberPos(i) {
+        return chainPosCache[i] || { x: player.x, y: player.y };
+    }
+
+    // アンカーが切り替わった瞬間、非アンカーの見た目位置が新しい基準へワープしないよう、
+    // 表示専用に「切り替わる直前の位置」から数フレームかけて寄せる。当たり判定には使わない。
+    let chainTransition = null; // { from: {i:{x,y}}, framesLeft, total }
+    function chainMemberDisplayPos(i) {
+        const raw = chainMemberPos(i);
+        if (!chainTransition || !chainTransition.from[i]) return raw;
+        const t = 1 - chainTransition.framesLeft / chainTransition.total;
+        const eased = 1 - (1 - t) * (1 - t);
+        return {
+            x: chainTransition.from[i].x + (raw.x - chainTransition.from[i].x) * eased,
+            y: chainTransition.from[i].y + (raw.y - chainTransition.from[i].y) * eased
+        };
+    }
+
+    // 先頭(0)がアンカー = 通常（先頭がロープの支点、後ろは一直線のロープの尾）→フルパワー
+    // 中間がアンカー = V字（前後どちらにも仲間が垂れる）→バランス型で控えめな弧
+    // 末尾がアンカー = 後方から（全員が末尾から一直線にぶら下がる）→鞭のように低く速いが不安定な弧
+    function jumpMultipliers() {
+        if (chainAnchorIndex === 0 || followerCount === 0) return { dist: 1.0, height: 1.0, shape: 'leader' };
+        const ahead = chainAnchorIndex, behind = followerCount - chainAnchorIndex;
+        if (ahead > 0 && behind > 0) return { dist: 0.5, height: 0.5, shape: 'v' };
+        return { dist: 0.65, height: 0.22, shape: 'tail' };
+    }
+
+    // ロープを離した角度（放物線の打ち出し角）と、掴んでいる仲間の重さ(jm.height)から
+    // 実際の弧の高さ・持ち上がり量を求める。低い角度で離すほど低く速い弾道、
+    // 高い角度（Perfect付近）で離すほど高く大きな弧になり、重いほど全体が押しつぶされる。
+    function computeJumpArc(releaseAngleDeg, jm) {
+        const posAngle = Math.max(0, releaseAngleDeg);
+        const heightBoost = Math.sin(posAngle * DEG_TO_RAD) / Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
+        return {
+            arcHeight: (30 + 230 * heightBoost) * jm.height,
+            liftY: (16 + 90 * heightBoost) * jm.height
+        };
+    }
+
+    // ============ 人間の追跡者 ============
+    const PURSUER_START_STAGE = 2; // 郊外から出現
+    let pursuerActive = false;
+    let chaseGap = 650;
+    const CHASE_GAP_MAX = 700;
+
+    function vineOmegaMult(type) {
+        if (type === 'wire') return 1.25;
+        if (type === 'cable') return 0.9;
+        if (type === 'crane') return 0.78;
+        return 1.0;
+    }
+
+    // ============ カラス（敵） ============
+    let crows = [];
+    let crowHitThisRun = false;
+    let crowGraceFrames = 0; // キャッチ直後の短い無敵猶予
+    let crowSpawnCursorX = 0;
+    const CROW_MIN_DIST = 60; // これより手前は出現しない（開始直後の猶予）
+
+    // ============ ロープが切れて落下する演出 ============
+    const ROPE_BREAK_MS = 3000;
+
+    function chainMultiplier() { return Math.min(followerCount + 1, 5); }
+
+    const skyPalettes = [
+        { top: [135, 206, 235], bottom: [224, 255, 255] },
+        { top: [255, 126, 95],  bottom: [254, 180, 123] },
+        { top: [43, 88, 118],   bottom: [78, 67, 118] },
+        { top: [2, 1, 17],      bottom: [32, 28, 41] },
+        { top: [116, 116, 191], bottom: [52, 138, 199] }
+    ];
+
+    for (let i = 0; i < 100; i++) stars.push({ x: Math.random() * 2000, y: Math.random() * VIRTUAL_HEIGHT * 0.8, size: Math.random() * 2, alpha: Math.random() });
+
+    function addFloatingText(text, x, y, color, size = 30) { floatingTexts.push({ text, x, y, life: 1.0, color, size }); }
+
+    function updateComboUI() {
+        const display = document.getElementById('combo-display');
+        if (player.combo >= 1) {
+            display.innerText = `${player.combo} COMBO! (x${(1 + player.combo * 0.5).toFixed(1)})`;
+            display.style.color = player.combo >= 4 ? '#ff3366' : (player.combo >= 2 ? '#00ffcc' : '#ffdd00');
+            display.style.transform = 'scale(1.2)';
+            setTimeout(() => display.style.transform = 'scale(1)', 100);
+        } else display.innerText = '';
+    }
+
+    // ============ WORLD GENERATION ============
+    function generateTrapeze(startT) {
+        let isLongJump = trapezes.length > 5 && Math.random() < 0.15 && !startT.isLongJump;
+        let spacing = isLongJump ? (600 + Math.random() * 200) : (300 + Math.random() * 250);
+        let nextX = startT.pivotX + spacing;
+        let nextY = TRAPEZE_PIVOT_Y;
+        let prevMaxSwingBackX = startT.pivotX + startT.length * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
+        let safeMargin = 60;
+        let maxAllowedLength = (nextX - prevMaxSwingBackX - safeMargin) / Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
+        maxAllowedLength = Math.min(maxAllowedLength, 600);
+        let minLength = 200;
+        if (maxAllowedLength < minLength) {
+            maxAllowedLength = minLength;
+            nextX = prevMaxSwingBackX + safeMargin + (minLength * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD));
+            spacing = nextX - startT.pivotX;
+        }
+        let ropeLength = minLength + Math.random() * (maxAllowedLength - minLength);
+        const stageInfo = getStageBlend(nextX / 10);
+
+        // 生成された瞬間（まだ画面外）にのみ位相を軽くバイアスし、プレイヤー側に振れやすくする。
+        // 表示された後は一切位相をいじらないので、見た目の不自然なワープは発生しない。
+        const initialTime = (-Math.PI / 2) + (Math.random() - 0.5) * Math.PI;
+        // 序盤はほぼ切れず、都市に進むほど切れるロープが増える難易度カーブ
+        const breakChance = Math.min(0.28, 0.03 + stageInfo.progress * 0.05);
+        const breakable = trapezes.length > 5 && Math.random() < breakChance;
+        let t = { pivotX: nextX, pivotY: nextY, length: ropeLength, amplitude: MAX_SWING_ANGLE, time: initialTime, angleDeg: 0, angleRad: 0, barX: 0, barY: 0, isLongJump, vineType: stageInfo.cur.vine, breakable, breakStarted: false, breakDeadline: 0, broken: false };
+        trapezes.push(t);
+
+        if (isLongJump) {
+            bananas.push({ x: startT.pivotX + spacing * 0.5, y: TRAPEZE_PIVOT_Y + 100 + Math.random() * 150, collected: false, type: 'golden' });
+        } else if (Math.random() < 0.5) {
+            let numBananas = 3, baseY = TRAPEZE_PIVOT_Y + 200 + Math.random() * 200, arcHeight = 80 + Math.random() * 60;
+            for (let j = 1; j <= numBananas; j++) {
+                let ratio = j / (numBananas + 1);
+                bananas.push({ x: startT.pivotX + spacing * ratio, y: baseY - Math.sin(ratio * Math.PI) * arcHeight, collected: false, type: 'normal' });
+            }
+        } else {
+            bananas.push({ x: startT.pivotX + spacing * 0.5, y: TRAPEZE_PIVOT_Y + 200 + Math.random() * 250, collected: false, type: 'normal' });
+        }
+    }
+
+    function initGameData() {
+        score = 0; distanceScore = 0; trapezes = []; bananas = []; floatingTexts = []; trailParticles = [];
+        shownStages.clear();
+        followerCount = 0; chainAnchorIndex = 0; chainTransition = null; chainLinkAngle = {}; chainLinkAngleVel = {}; pursuerActive = false; chaseGap = CHASE_GAP_MAX;
+        crows = []; crowSpawnCursorX = 0; crowHitThisRun = false; crowGraceFrames = 40;
+        let firstT = { pivotX: 200, pivotY: TRAPEZE_PIVOT_Y, length: 450, amplitude: MAX_SWING_ANGLE, time: Math.PI / 2, angleDeg: 0, angleRad: 0, barX: 0, barY: 0, isLongJump: false, vineType: 'vine', breakable: false, breakStarted: false, breakDeadline: 0, broken: false };
+        trapezes.push(firstT);
+        for (let i = 1; i < 6; i++) generateTrapeze(trapezes[trapezes.length - 1]);
+        firstT.angleRad = firstT.amplitude * DEG_TO_RAD * Math.sin(firstT.time);
+        firstT.barX = firstT.pivotX + firstT.length * Math.sin(firstT.angleRad);
+        firstT.barY = firstT.pivotY + firstT.length * Math.cos(firstT.angleRad);
+        player = { state: 'SWINGING', trapezeIndex: 0, x: firstT.barX, y: firstT.barY, flightStartX: 0, flightStartY: 0, flightTargetX: 0, flightTargetY: 0, flightProgress: 0, flightSpeed: 0, canDoubleJump: false, hasDoubleJumped: false, rollAngle: 0, lastY: firstT.barY, combo: 0, catchStartX: 0, catchStartY: 0, catchProgress: 0, catchFrames: 5, scaleX: 1, scaleY: 1, mood: 'normal', moodTimer: 0, tailPhase: 0, arcHeightMult: 1, primaryArcHeight: 250, launchTrapezeIndex: -1, fallVy: 0 };
+        cameraX = player.x - (canvas.width / scale) * 0.2;
+        document.getElementById('score').innerText = '0';
+        document.getElementById('stage-display').innerText = STAGES[0].name;
+        updateComboUI();
+        updateChainDisplay();
+        showStoryCaption(STAGES[0]);
+        shownStages.add(0);
+    }
+
+    window.startGame = function(e) {
+        if (e) e.stopPropagation();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        startAmbient();
+        startBGM();
+        document.getElementById('titleScreen').classList.add('hidden');
+        document.getElementById('resultScreen').classList.add('hidden');
+        document.getElementById('aim-display').classList.remove('hidden');
+        document.getElementById('pause-btn').classList.remove('hidden');
+        document.getElementById('pause-btn').innerText = '⏸️';
+        isPaused = false;
+        gameState = 'PLAYING';
+        STATS.totalPlays++;
+        saveStats();
+        unlockAchievement('first_play');
+    };
+
+    window.resetGame = function(e) { if (e) e.stopPropagation(); initGameData(); window.startGame(); };
+
+    function checkBananaCollision() {
+        bananas.forEach(b => {
+            if (!b.collected) {
+                let hitRadius = b.type === 'golden' ? 120 : 90;
+                let hit = false;
+                for (let i = 0; i <= followerCount; i++) {
+                    const mp = chainMemberPos(i);
+                    const r = i === 0 ? hitRadius : hitRadius * 0.75;
+                    if (Math.hypot(mp.x - b.x, mp.y - b.y) < r) { hit = true; break; }
+                }
+                if (hit) {
+                    b.collected = true;
+                    playSound(b.type === 'golden' ? 'golden' : 'banana');
+                    let basePoints = b.type === 'golden' ? 500 : 100;
+                    let earnedPoints = Math.floor(basePoints * (1 + player.combo * 0.5) * chainMultiplier());
+                    score += earnedPoints;
+                    document.getElementById('score').innerText = score;
+                    if (score >= 5000) unlockAchievement('legendary_score');
+                    if (b.type === 'golden') addFloatingText(`BIG BONUS! +${earnedPoints}`, b.x, b.y - 40, '#ffdd00', 34);
+                    else addFloatingText(`+${earnedPoints}`, b.x, b.y - 20, '#ffdd00');
+                    player.mood = 'eating'; player.moodTimer = 14;
+                }
+            }
+        });
+    }
+
+    function computePreviewTrajectory() {
+        const t = trapezes[player.trapezeIndex];
+        if (!t) return null;
+        const angleDeg = t.angleDeg;
+        const jm = jumpMultipliers();
+        const jumpDistance = (angleDeg > 0 ? BASE_DISTANCE + (Math.min(angleDeg / MAX_SWING_ANGLE, 1.0) * BONUS_DISTANCE) : 50) * jm.dist;
+        const arc = computeJumpArc(angleDeg, jm);
+        const targetX = player.x + jumpDistance;
+        const targetY = player.y - arc.liftY;
+
+        const nextT = trapezes[player.trapezeIndex + 1];
+        let quality = 'red';
+        if (nextT) {
+            const reach = nextT.length * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
+            const minX = nextT.pivotX - reach, maxX = nextT.pivotX + reach;
+            const margin = (maxX - minX) * 0.18;
+            if (targetX > minX + margin && targetX < maxX - margin) quality = 'green';
+            else if (targetX > minX - 20 && targetX < maxX + 20) quality = 'yellow';
+            else quality = 'red';
+        }
+        return { startX: player.x, startY: player.y, targetX, targetY, quality, jumpDistance, heightMult: jm.height, shape: jm.shape, arcHeightPx: arc.arcHeight };
+    }
+
+    function updateAimUI() {
+        const box = document.getElementById('aim-display');
+        const txt = document.getElementById('aim-text');
+        if (gameState !== 'PLAYING' || player.state !== 'SWINGING') { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        const preview = computePreviewTrajectory();
+        if (!preview) { txt.innerText = '-'; return; }
+        const labels = { green: '届く', yellow: 'ギリギリ', red: '届かない' };
+        const colors = { green: '#7CFC00', yellow: '#ffdd00', red: '#ff6666' };
+        const shapeLabels = { v: '（V字：控えめな弧）', tail: '（後方から：低く不安定な弧）' };
+        const suffix = shapeLabels[preview.shape] || '';
+        txt.innerText = labels[preview.quality] + suffix;
+        txt.style.color = colors[preview.quality];
+    }
+
+    function triggerGameOver(message) {
+        if (gameState !== 'PLAYING') return;
+        gameState = 'GAMEOVER';
+        playSound('fall');
+        stopBGM();
+        stopAmbient();
+        document.getElementById('finalScore').innerText = score;
+        document.getElementById('stageReached').innerText = message;
+        document.getElementById('resultScreen').classList.remove('hidden');
+        document.getElementById('aim-display').classList.add('hidden');
+        document.getElementById('pause-btn').classList.add('hidden');
+
+        if (!crowHitThisRun && distanceScore >= 300) unlockAchievement('crow_free');
+        STATS.totalDistance += distanceScore;
+        if (STATS.totalDistance >= 5000) unlockAchievement('marathon');
+        const isNewBest = score > STATS.bestScore;
+        if (score > STATS.bestScore) STATS.bestScore = score;
+        if (distanceScore > STATS.bestDistance) STATS.bestDistance = distanceScore;
+        saveStats();
+        updateTitleBest();
+        const badge = document.getElementById('new-best-badge');
+        badge.classList.toggle('hidden', !isNewBest);
+        document.getElementById('result-best').innerText = `自己ベスト: ${STATS.bestScore}点 / ${STATS.bestDistance}m`;
+    }
+
+    // ============ カラス：出現・移動・当たり判定 ============
+    function maybeSpawnCrow() {
+        const viewW = canvas.width / scale;
+        const spawnEdgeX = cameraX + viewW + 120;
+        if (spawnEdgeX - crowSpawnCursorX < 420 + Math.random() * 260) return;
+        crowSpawnCursorX = spawnEdgeX;
+        if (distanceScore < CROW_MIN_DIST) return;
+        // 距離が進むほど出現率が上がる難易度カーブ（序盤は控えめ、都市ではしっかり脅威に）
+        const spawnChance = Math.min(0.7, 0.22 + distanceScore / 1800);
+        if (Math.random() > spawnChance) return;
+        const y = 130 + Math.random() * 360;
+        const speed = 3.0 + Math.random() * 2.0 + Math.min(2, distanceScore / 1200);
+        crows.push({ x: spawnEdgeX, y, vx: -speed, wingPhase: Math.random() * 10 });
+    }
+
+    function spawnCrowHitParticles(pos) {
+        for (let i = 0; i < 8; i++) {
+            trailParticles.push({ x: pos.x, y: pos.y, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 3, size: 2 + Math.random() * 3, color: '#222222', life: 1.0, decay: 0.05 + Math.random() * 0.05 });
+        }
+    }
+
+    function handleCrowHit(k) {
+        crowHitThisRun = true;
+        const hitPos = chainLinkPos(k);
+        spawnCrowHitParticles(hitPos);
+        playSound('grabWire');
+        if (k === 0 || chainAnchorIndex >= k) {
+            startCrowFatalFall(k === 0 ? 'カラスに直撃された！' : '先頭の猿が振り落とされた！');
+            return;
+        }
+        // k はアンカーより後ろ（末尾側）なので、先頭〜アンカーを含む前半は生存。k以降は切り離されて落下。
+        addFloatingText(`カラスに${followerCount - k + 1}匹やられた！`, player.x, player.y - 80, '#ff8888', 22);
+        followerCount = k - 1;
+        updateChainDisplay();
+    }
+
+    // 直撃で致命傷になった場合、その場で即ゲームオーバーにせず、いったん落下させてから表示する
+    function startCrowFatalFall(message) {
+        player.state = 'CROW_FALLING';
+        player.fallVy = 0.5;
+        player.mood = 'panic'; player.moodTimer = 999;
+        player.pendingGameOverMsg = message;
+    }
+
+    function updateCrows() {
+        for (let i = crows.length - 1; i >= 0; i--) {
+            const c = crows[i];
+            c.x += c.vx; c.wingPhase += 0.3;
+            if (c.x < cameraX - 100) { crows.splice(i, 1); continue; }
+            if (gameState !== 'PLAYING' || crowGraceFrames > 0) continue;
+            let hitMember = -1;
+            for (let mi = 0; mi <= followerCount; mi++) {
+                const mp = chainLinkPos(mi);
+                const r = mi === 0 ? 30 : 24;
+                if (Math.hypot(mp.x - c.x, mp.y - c.y) < r) { hitMember = mi; break; }
+            }
+            if (hitMember !== -1) {
+                crows.splice(i, 1);
+                handleCrowHit(hitMember);
+            }
+        }
+    }
+
+    function update() {
+        player.lastY = player.y;
+        player.scaleX += (1 - player.scaleX) * 0.18;
+        player.scaleY += (1 - player.scaleY) * 0.18;
+        player.tailPhase += 0.12;
+        if (player.moodTimer > 0) { player.moodTimer--; if (player.moodTimer === 0) player.mood = 'normal'; }
+        if (crowGraceFrames > 0) crowGraceFrames--;
+        if (chainTransition) { chainTransition.framesLeft--; if (chainTransition.framesLeft <= 0) chainTransition = null; }
+        updateChainPendulum();
+        if (gameState === 'PLAYING') {
+            if (pursuerActive) {
+                chaseGap -= 0.16;
+                if (chaseGap <= 0) triggerGameOver('捕まった！人間に見つかってしまった…');
+            }
+            maybeSpawnCrow();
+            updateCrows();
+        }
+        trapezes.forEach((t, idx) => {
+            if (t.broken) return; // 切れたロープはそこで静止（見た目も描画しない）
+            let omega = Math.sqrt(0.6 / (t.length / 100)) * 0.05 * vineOmegaMult(t.vineType);
+            // 掴まっている仲間が多いほど、実際に掴んでいるロープが重く・ゆっくり揺れる
+            if (followerCount > 0 && idx === player.trapezeIndex && (player.state === 'SWINGING' || player.state === 'CATCHING')) {
+                omega /= (1 + followerCount * 0.13);
+            }
+            t.time += omega;
+            t.angleDeg = t.amplitude * Math.sin(t.time);
+            t.angleRad = t.angleDeg * DEG_TO_RAD;
+            t.barX = t.pivotX + t.length * Math.sin(t.angleRad);
+            t.barY = t.pivotY + t.length * Math.cos(t.angleRad);
+        });
+        floatingTexts.forEach(ft => { ft.life -= 0.02; ft.y -= 1; });
+        floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+        trailParticles.forEach(p => { p.x += p.vx; p.y += p.vy; p.life -= p.decay; });
+        trailParticles = trailParticles.filter(p => p.life > 0);
+
+        if (player.state === 'SWINGING') {
+            const t = trapezes[player.trapezeIndex];
+            if (t) {
+                player.x = t.barX; player.y = t.barY;
+                if (player.moodTimer === 0) player.mood = (t.angleDeg >= MAX_SWING_ANGLE * 0.85) ? 'charging' : 'normal';
+                if (gameState === 'PLAYING' && t.breakable && !t.breakStarted) {
+                    t.breakStarted = true; t.breakDeadline = performance.now() + ROPE_BREAK_MS;
+                }
+                if (gameState === 'PLAYING' && t.breakStarted && !t.broken && performance.now() >= t.breakDeadline) {
+                    t.broken = true;
+                    player.state = 'ROPE_FALLING'; player.fallVy = 0.5;
+                    player.mood = 'panic'; player.moodTimer = 999;
+                    playSound('grabCable');
+                    spawnCrowHitParticles({ x: player.x, y: player.y - 10 });
+                    addFloatingText('ロープが切れた！', player.x, player.y - 80, '#ff5555', 24);
+                }
+            }
+            if (gameState === 'PLAYING') checkBananaCollision();
+        } else if (player.state === 'ROPE_FALLING') {
+            // ロープが切れて落下中。タップで緊急ジャンプして近くのロープに逃げられる。
+            player.fallVy += 0.5;
+            player.y += player.fallVy;
+            player.x += 1.4;
+            if (gameState === 'PLAYING') checkBananaCollision();
+            if (player.y > GROUND_LEVEL - (MONKEY_SIZE / 2)) triggerGameOver('切れたロープごと落下した…');
+        } else if (player.state === 'CROW_FALLING') {
+            // カラスに致命傷を負わされた直後。掴む物がないのでそのまま地面まで落ちてからゲームオーバーにする。
+            player.fallVy += 0.5;
+            player.y += player.fallVy;
+            player.x += 0.8;
+            if (player.y > GROUND_LEVEL - (MONKEY_SIZE / 2)) triggerGameOver(player.pendingGameOverMsg || 'カラスに襲われた！');
+        } else if (player.state === 'CATCHING') {
+            // キャッチ位置からツルの現在位置へ数フレームかけて滑らかに寄せる（瞬間ワープを防ぐ）。
+            // 距離が大きいほど少し時間をかけ、常に自然な「グッと引き寄せる」動きに見えるようにする。
+            const t = trapezes[player.trapezeIndex];
+            player.catchProgress += 1 / player.catchFrames;
+            if (!t || player.catchProgress >= 1) {
+                player.state = 'SWINGING';
+                if (t) { player.x = t.barX; player.y = t.barY; }
+            } else {
+                const ease = 1 - Math.pow(1 - player.catchProgress, 2);
+                player.x = player.catchStartX + (t.barX - player.catchStartX) * ease;
+                player.y = player.catchStartY + (t.barY - player.catchStartY) * ease;
+            }
+            if (gameState === 'PLAYING') checkBananaCollision();
+        } else if (player.state === 'FLYING' && gameState === 'PLAYING') {
+            player.flightProgress += player.flightSpeed;
+            if (player.combo >= 3) {
+                const particleCount = Math.min(player.combo, 5);
+                const hue = player.combo >= 4 ? Math.random() * 60 - 20 : (player.combo >= 3 ? 50 + Math.random() * 20 : 180);
+                for (let i = 0; i < particleCount; i++) trailParticles.push({ x: player.x + (Math.random() - 0.5) * 40, y: player.y + (Math.random() - 0.5) * 40, vx: -2 - Math.random() * 3, vy: (Math.random() - 0.5) * 2, size: 3 + Math.random() * 5, color: `hsl(${hue}, 100%, 70%)`, life: 1.0, decay: 0.05 + Math.random() * 0.05 });
+            }
+            if (player.flightProgress <= 1.0) {
+                player.x = player.flightStartX + (player.flightTargetX - player.flightStartX) * player.flightProgress;
+                const linearY = player.flightStartY + (player.flightTargetY - player.flightStartY) * player.flightProgress;
+                const baseArcHeight = player.hasDoubleJumped ? 180 * (player.arcHeightMult != null ? player.arcHeightMult : 1) : (player.primaryArcHeight != null ? player.primaryArcHeight : 250);
+                const arcHeight = baseArcHeight * Math.sin(player.flightProgress * Math.PI);
+                player.y = linearY - arcHeight;
+                const isMovingUp = player.y < player.lastY;
+                if (player.hasDoubleJumped && isMovingUp) player.rollAngle += 0.3; else player.rollAngle = 0;
+                if (player.moodTimer === 0 && !player.hasDoubleJumped) player.mood = isMovingUp ? 'soaring' : 'normal';
+                if (player.y > GROUND_LEVEL - 220 && player.moodTimer === 0) player.mood = 'panic';
+                checkBananaCollision();
+                // 前方だけでなく、少し飛んで離れた後は「一度飛んでしまった」直前のツルまで再キャッチ判定に含める
+                // （離陸直後に同じツルへ即座に戻ってしまわないよう、ある程度進んでから有効にする）。
+                // 後ろに垂れ下がった仲間が、離れたばかりのツルへスイングバックして掴み直せるようになる。
+                const searchStart = player.flightProgress > 0.25 ? Math.max(0, player.trapezeIndex - 3) : player.trapezeIndex + 1;
+                catchSearch: for (let i = searchStart; i < trapezes.length; i++) {
+                    if (i === player.launchTrapezeIndex) continue; // 離陸した本人のツルは今回のフライト中スキップ（固まり防止）
+                    const t = trapezes[i];
+                    // ロープに一番近い個体（先頭 or 仲間のどれか）が掴む
+                    let bestMi = -1, bestDist = Infinity, bestPos = null;
+                    for (let mi = 0; mi <= followerCount; mi++) {
+                        // 遷移アニメ中でも「実際に画面に見えている位置」で判定・キャッチする
+                        const mpos = chainLinkPos(mi);
+                        const rad = mi === 0 ? CATCH_RADIUS : CATCH_RADIUS * 0.85;
+                        const snapDist = Math.hypot(mpos.x - t.barX, mpos.y - t.barY);
+                        if (snapDist < rad && snapDist < bestDist) { bestDist = snapDist; bestMi = mi; bestPos = mpos; }
+                    }
+                    if (bestMi !== -1) {
+                        // その個体自身は今いた場所からそのまま繋がるので瞬間移動しない。
+                        // それ以外の仲間（旧アンカー含む）は新基準の位置へ数フレームかけて表示上だけ寄せる。
+                        if (bestMi !== chainAnchorIndex) {
+                            const fromPositions = {};
+                            for (let k = 0; k <= followerCount; k++) fromPositions[k] = chainLinkPos(k);
+                            chainAnchorIndex = bestMi;
+                            chainTransition = { from: fromPositions, framesLeft: 14, total: 14 };
+                        }
+                        player.x = bestPos.x; player.y = bestPos.y;
+                        player.state = 'CATCHING'; player.trapezeIndex = i;
+                        player.catchStartX = player.x; player.catchStartY = player.y; player.catchProgress = 0;
+                        player.catchFrames = Math.max(3, Math.min(14, Math.round(bestDist / 22)));
+                        crowGraceFrames = 20;
+                        player.scaleX = 1.3; player.scaleY = 0.7;
+                        player.mood = 'normal'; player.moodTimer = 0;
+                        playGrabSound(t.vineType);
+                        spawnGrabParticles(t);
+                        chaseGap = Math.min(CHASE_GAP_MAX, chaseGap + (player.combo >= 1 ? 90 : 25));
+                        if (bestMi !== 0) addFloatingText('仲間がロープを掴んだ！', player.x, player.y - 70, '#ffaa55', 20);
+                        const newDistScore = Math.floor(player.x / 10);
+                        if (newDistScore > distanceScore) {
+                            score += (newDistScore - distanceScore);
+                            distanceScore = newDistScore;
+                            document.getElementById('score').innerText = score;
+                            if (score >= 5000) unlockAchievement('legendary_score');
+                            checkStageProgress();
+                            checkFollowerRecruit();
+                        }
+                        break catchSearch;
+                    }
+                }
+            } else {
+                // 弧を過ぎて落下し始めたら、仲間の重さが重いほど早く落ちる
+                const fallJm = jumpMultipliers();
+                player.y += 18 * (2 - fallJm.height); player.x += 5;
+            }
+            if (player.y > GROUND_LEVEL - (MONKEY_SIZE / 2)) {
+                const stageNow = getStageBlend(distanceScore).cur;
+                triggerGameOver(`到達エリア: ${stageNow.name}`);
+            }
+        }
+        const targetCamX = player.x - (canvas.width / scale) * 0.22;
+        if (targetCamX > cameraX) cameraX += (targetCamX - cameraX) * 0.1;
+        if (trapezes.length > 0 && trapezes[trapezes.length - 1].pivotX < cameraX + (canvas.width / scale) + 700) generateTrapeze(trapezes[trapezes.length - 1]);
+        updateAimUI();
+        updateAmbient(getStageBlend(distanceScore).progress / (STAGES.length - 1));
+    }
+
+    function checkStageProgress() {
+        const info = getStageBlend(distanceScore);
+        if (!shownStages.has(info.idx)) {
+            shownStages.add(info.idx);
+            showStoryCaption(STAGES[info.idx]);
+        }
+        document.getElementById('stage-display').innerText = STAGES[info.idx].name;
+        if (!pursuerActive && info.idx >= PURSUER_START_STAGE) {
+            pursuerActive = true;
+            addFloatingText('人間が追ってくる！', player.x, player.y - 100, '#ff8888', 26);
+        }
+        if (info.idx >= STAGES.length - 1) unlockAchievement('city_ruler');
+        if (distanceScore >= 1500) unlockAchievement('high_flyer');
+    }
+
+    function updateChainDisplay() {
+        const el = document.getElementById('chain-display');
+        const n = followerCount + 1;
+        el.innerText = n > 1 ? `🐒×${n} バナナ${chainMultiplier()}倍！` : '';
+    }
+
+    function checkFollowerRecruit() {
+        if (followerCount >= FOLLOWER_MILESTONES.length) return;
+        if (distanceScore >= FOLLOWER_MILESTONES[followerCount]) {
+            followerCount++;
+            playSound('recruit');
+            addFloatingText(`+1 なかま！(${followerCount}匹)`, player.x, player.y - 60, '#7CFC00', 24);
+            updateChainDisplay();
+            if (followerCount + 1 > STATS.bestChain) { STATS.bestChain = followerCount + 1; saveStats(); }
+            if (followerCount + 1 >= 5) unlockAchievement('big_troop');
+        }
+    }
+
+    // ============ BACKGROUND SILHOUETTES ============
+    function stageProgressAt(worldX) {
+        return getStageBlend(worldX / 10).progress;
+    }
+
+    const silhouetteCache = {};
+    function getSilhouetteSlot(s, isBuilding, h, w, progress) {
+        const key = s + '_' + (isBuilding ? 'b' : 't');
+        let entry = silhouetteCache[key];
+        if (entry) return entry;
+        entry = { windows: [], hasFlag: false };
+        if (isBuilding && progress > 3.2) {
+            let row = 0;
+            for (let wy = 10; wy < h - 6; wy += 16, row++) {
+                let col = 0;
+                for (let wx = -w / 2 + 6; wx < w / 2 - 6; wx += 12, col++) {
+                    if (hash1(s * 101.7 + row * 7.3 + col * 13.1) > 0.5) entry.windows.push([wx, wy]);
+                }
+            }
+        }
+        if (isBuilding && progress > 4.6 && hash1(s * 21.0) > 0.6) entry.hasFlag = true;
+        silhouetteCache[key] = entry;
+        return entry;
+    }
+
+    function drawSilhouetteLayer(camX, slotWidth, speedFactor, baseY, sizeScale, alpha) {
+        const viewW = canvas.width / scale;
+        const startSlot = Math.floor((camX * speedFactor - 300) / slotWidth) - 1;
+        const endSlot = Math.floor((camX * speedFactor + viewW + 300) / slotWidth) + 1;
+        for (let s = startSlot; s <= endSlot; s++) {
+            const worldSlotX = s * slotWidth;
+            const jitter = hash1(s * 7.1 + 1) * slotWidth * 0.6;
+            const drawX = worldSlotX + jitter - camX * speedFactor;
+            const trueWorldX = worldSlotX + jitter + camX - camX * speedFactor;
+            const progress = stageProgressAt(Math.max(0, trueWorldX));
+            const treeChance = Math.max(0, Math.min(1, 1 - progress / (STAGES.length - 1)));
+            const isBuilding = hash1(s * 13.3 + 2) > treeChance;
+
+            ctx.globalAlpha = alpha;
+            if (isBuilding) {
+                const h = (60 + hash1(s * 3.3) * 220) * sizeScale;
+                const w = (30 + hash1(s * 5.7) * 46) * sizeScale;
+                const grey = 40 + hash1(s * 9.1) * 40;
+                ctx.fillStyle = `rgb(${grey},${grey},${grey + 8})`;
+                ctx.fillRect(drawX - w / 2, baseY - h, w, h);
+                const slot = getSilhouetteSlot(s, true, h, w, progress);
+                if (slot.windows.length) {
+                    ctx.fillStyle = 'rgba(255,215,80,0.5)';
+                    for (const [wx, wy] of slot.windows) ctx.fillRect(drawX + wx, baseY - h + wy, 4, 6);
+                }
+                if (slot.hasFlag) {
+                    ctx.fillStyle = '#c94a3a';
+                    ctx.fillRect(drawX - 2, baseY - h - 16, 4, 16);
+                    ctx.beginPath(); ctx.moveTo(drawX + 2, baseY - h - 16); ctx.lineTo(drawX + 18, baseY - h - 10); ctx.lineTo(drawX + 2, baseY - h - 4); ctx.fill();
+                }
+            } else {
+                const h = (50 + hash1(s * 4.4) * 70) * sizeScale;
+                const green = 60 + hash1(s * 2.2) * 50;
+                ctx.fillStyle = `rgb(20,${green + 30},30)`;
+                ctx.fillRect(drawX - 4 * sizeScale, baseY - h * 0.4, 8 * sizeScale, h * 0.4);
+                ctx.fillStyle = `rgb(15,${green},20)`;
+                ctx.beginPath();
+                ctx.arc(drawX, baseY - h * 0.4, h * 0.42, 0, Math.PI * 2);
+                ctx.arc(drawX - h * 0.22, baseY - h * 0.28, h * 0.3, 0, Math.PI * 2);
+                ctx.arc(drawX + h * 0.22, baseY - h * 0.3, h * 0.32, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function drawGround(camX) {
+        const info = getStageBlend(distanceScore);
+        const groundPalettes = [
+            [26, 60, 20], [40, 60, 22], [64, 52, 34], [70, 70, 74], [36, 36, 40], [46, 38, 30]
+        ];
+        const edgePalettes = [
+            [34, 130, 34], [60, 120, 40], [110, 90, 40], [180, 180, 60], [230, 200, 60], [230, 170, 40]
+        ];
+        const gCol = lerpColor(groundPalettes[info.idx], groundPalettes[Math.min(info.idx + 1, groundPalettes.length - 1)], info.t);
+        const eCol = lerpColor(edgePalettes[info.idx], edgePalettes[Math.min(info.idx + 1, edgePalettes.length - 1)], info.t);
+        ctx.fillStyle = rgb(gCol);
+        ctx.fillRect(0, GROUND_LEVEL, canvas.width / scale, VIRTUAL_HEIGHT - GROUND_LEVEL);
+        ctx.beginPath(); ctx.moveTo(0, GROUND_LEVEL); ctx.lineTo(canvas.width / scale, GROUND_LEVEL);
+        ctx.strokeStyle = rgb(eCol); ctx.lineWidth = 8; ctx.stroke();
+
+        if (info.progress > 2.5) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 4; ctx.setLineDash([24, 20]);
+            ctx.beginPath();
+            const laneY = GROUND_LEVEL + 40;
+            ctx.moveTo(-camX % 44, laneY); ctx.lineTo(canvas.width / scale, laneY);
+            ctx.stroke(); ctx.setLineDash([]);
+        }
+    }
+
+    function drawVine(t) {
+        const style = t.vineType;
+        ctx.save();
+        if (style === 'vine') {
+            ctx.strokeStyle = '#4a3218'; ctx.lineWidth = 7;
+            ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
+            const leafN = 4;
+            for (let i = 1; i <= leafN; i++) {
+                const rt = i / (leafN + 1);
+                const lx = t.pivotX + (t.barX - t.pivotX) * rt;
+                const ly = t.pivotY + (t.barY - t.pivotY) * rt;
+                ctx.fillStyle = '#2e8b3a';
+                ctx.beginPath(); ctx.ellipse(lx + 6, ly, 7, 4, t.angleRad, 0, Math.PI * 2); ctx.fill();
+            }
+        } else if (style === 'wire') {
+            ctx.fillStyle = '#333'; ctx.fillRect(t.pivotX - 3, 0, 6, t.pivotY);
+            ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
+        } else if (style === 'cable') {
+            ctx.fillStyle = '#666'; ctx.fillRect(t.pivotX - 22, 0, 44, t.pivotY + 6);
+            ctx.strokeStyle = '#8899a5'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
+        } else {
+            ctx.strokeStyle = '#b0b0b0'; ctx.lineWidth = 3; ctx.setLineDash([2, 4]);
+            ctx.beginPath(); ctx.moveTo(t.pivotX, 0); ctx.lineTo(t.pivotX, t.pivotY); ctx.stroke(); ctx.setLineDash([]);
+            ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
+        }
+        ctx.restore();
+
+        const pivotColor = t.isLongJump ? '#800000' : (style === 'vine' ? '#3a2a15' : '#222');
+        ctx.beginPath(); ctx.arc(t.pivotX, t.pivotY, 12, 0, Math.PI * 2); ctx.fillStyle = pivotColor; ctx.fill();
+
+        if (style === 'crane') {
+            ctx.fillStyle = '#7d7d7d';
+            ctx.beginPath();
+            ctx.moveTo(t.barX - 12, t.barY); ctx.lineTo(t.barX + 12, t.barY);
+            ctx.lineTo(t.barX + 8, t.barY + 14); ctx.lineTo(t.barX - 8, t.barY + 14);
+            ctx.fill();
+        } else {
+            ctx.beginPath(); ctx.arc(t.barX, t.barY, 9, 0, Math.PI * 2); ctx.fillStyle = '#D2691E'; ctx.fill();
+        }
+    }
+
+    // 破損タイマー中のロープに警告表示（残り時間が短いほど激しく点滅）
+    function drawBreakWarning(t) {
+        const remain = Math.max(0, t.breakDeadline - performance.now());
+        const urgency = 1 - remain / ROPE_BREAK_MS;
+        const blink = 0.4 + Math.sin(performance.now() / (140 - urgency * 90)) * 0.4;
+        ctx.save();
+        ctx.globalAlpha = 0.35 + urgency * 0.5 * blink;
+        ctx.strokeStyle = '#ff3333'; ctx.lineWidth = 3; ctx.setLineDash([5, 5]);
+        ctx.beginPath(); ctx.moveTo(t.pivotX, t.pivotY); ctx.lineTo(t.barX, t.barY); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
+    // ============ カラス（敵）描画 ============
+    function drawCrows() {
+        crows.forEach(c => {
+            const flap = Math.sin(c.wingPhase) * 14;
+            ctx.save();
+            ctx.translate(c.x, c.y);
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath(); ctx.ellipse(0, 0, 12, 7, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-18, -flap); ctx.lineTo(-6, 2); ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(18, -flap); ctx.lineTo(6, 2); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#e8a33d';
+            ctx.beginPath(); ctx.moveTo(-12, -1); ctx.lineTo(-19, 1); ctx.lineTo(-12, 3); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-8, -2, 1.6, 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        });
+    }
+
+    // ============ MONKEY (procedural) ============
+    function drawMonkey(x, y, rotation, state, comboGlow, opts) {
+        opts = opts || {};
+        const scaleX = opts.scaleX != null ? opts.scaleX : 1;
+        const scaleY = opts.scaleY != null ? opts.scaleY : 1;
+        const mood = opts.mood || 'normal';
+        const tailPhase = opts.tailPhase || 0;
+        const accessory = opts.accessory || 0;
+        const sizeMult = opts.sizeMult || 1;
+        const alpha = opts.alpha != null ? opts.alpha : 1;
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(rotation);
+        ctx.scale(sizeMult, sizeMult);
+        ctx.scale(scaleX, scaleY);
+
+        if (comboGlow) { ctx.shadowColor = comboGlow; ctx.shadowBlur = 16; }
+
+        // 上昇中は勢いを感じる風の線
+        if (state === 'FLYING_RISE') {
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+            for (let i = 0; i < 3; i++) {
+                const off = -14 - i * 7;
+                ctx.beginPath(); ctx.moveTo(off, 10 + i * 5); ctx.lineTo(off - 10, 18 + i * 5); ctx.stroke();
+            }
+        }
+
+        // しっぽ（慣性で少し遅れて揺れる）
+        const isFlyingPose = state === 'FLYING' || state === 'FLYING_RISE' || state === 'FLYING_FALL';
+        const tailSway = Math.sin(tailPhase) * (isFlyingPose ? 10 : 5);
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-7, 7);
+        if (state === 'FLYING_RISE') ctx.quadraticCurveTo(-30 + tailSway * 0.4, 14 + tailSway, -42 + tailSway * 0.6, 6 + tailSway * 0.6);
+        else if (state === 'FLYING_FALL') ctx.quadraticCurveTo(-22 + tailSway * 0.3, -4 + tailSway, -30 + tailSway * 0.5, -14 + tailSway * 0.5);
+        else if (isFlyingPose) ctx.quadraticCurveTo(-26 + tailSway * 0.3, 6 + tailSway, -36 + tailSway * 0.5, -2 + tailSway * 0.5);
+        else if (state === 'ROLLING') ctx.quadraticCurveTo(-22, -16, -9, -28);
+        else ctx.quadraticCurveTo(-18 + tailSway, 24, -5 + tailSway * 1.4, 36);
+        ctx.stroke();
+
+        // 体（丸くぷっくり）
+        ctx.fillStyle = '#9a6a35';
+        ctx.beginPath(); ctx.ellipse(0, 6, 16, 20, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F4C2C2';
+        ctx.beginPath(); ctx.ellipse(0, 10, 8, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+        // 腕
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 5.5; ctx.lineCap = 'round';
+        ctx.beginPath();
+        if (state === 'SWINGING') { ctx.moveTo(-10, -8); ctx.lineTo(0, -38); ctx.moveTo(10, -8); ctx.lineTo(0, -38); }
+        else if (state === 'ROLLING') { ctx.moveTo(-10, -5); ctx.lineTo(-18, -18); ctx.moveTo(10, -5); ctx.lineTo(18, -18); }
+        else if (mood === 'perfect') { ctx.moveTo(-10, -6); ctx.lineTo(-20, -22); ctx.moveTo(10, -6); ctx.lineTo(20, -22); }
+        else if (state === 'FLYING_RISE') { ctx.moveTo(-10, -6); ctx.lineTo(-24, -26); ctx.moveTo(10, -6); ctx.lineTo(24, -26); }
+        else if (state === 'FLYING_FALL') { ctx.moveTo(-10, -6); ctx.lineTo(15, -3); ctx.moveTo(10, -6); ctx.lineTo(17, -12); }
+        else { ctx.moveTo(-10, -6); ctx.lineTo(11, -17); ctx.moveTo(10, -6); ctx.lineTo(11, -17); }
+        ctx.stroke();
+
+        // 脚
+        ctx.beginPath();
+        if (state === 'SWINGING') { ctx.moveTo(-5, 20); ctx.lineTo(-5, 30); ctx.moveTo(5, 20); ctx.lineTo(5, 30); }
+        else if (state === 'FLYING_RISE') { ctx.moveTo(-5, 18); ctx.lineTo(-13, 33); ctx.moveTo(5, 18); ctx.lineTo(15, 31); }
+        else if (state === 'FLYING_FALL') { ctx.moveTo(-5, 18); ctx.lineTo(1, 27); ctx.moveTo(5, 18); ctx.lineTo(9, 25); }
+        else { ctx.moveTo(-5, 18); ctx.lineTo(-15, 29); ctx.moveTo(5, 18); ctx.lineTo(-15, 29); }
+        ctx.stroke();
+
+        // 頭（大きめ・かわいい比率）
+        ctx.save(); ctx.translate(0, -17);
+        ctx.fillStyle = '#9a6a35'; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#8B5A2B';
+        ctx.beginPath(); ctx.arc(-17, -3, 6.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(17, -3, 6.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F4C2C2';
+        ctx.beginPath(); ctx.arc(-17, -3, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(17, -3, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F4C2C2';
+        ctx.beginPath(); ctx.ellipse(0, 4, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
+
+        // 頬っぺた（常に少し赤い、食べ中はぷっくり）
+        ctx.fillStyle = 'rgba(255,120,140,0.55)';
+        const cheekPuff = mood === 'eating' ? 1.5 : 1.0;
+        ctx.beginPath(); ctx.ellipse(-9 * cheekPuff, 6, 4.2 * cheekPuff, 3, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(9 * cheekPuff, 6, 4.2 * cheekPuff, 3, 0, 0, Math.PI * 2); ctx.fill();
+
+        // 眉毛
+        ctx.strokeStyle = '#5a3a18'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath();
+        if (mood === 'charging') { ctx.moveTo(-8, -6); ctx.lineTo(-2, -8); ctx.moveTo(8, -6); ctx.lineTo(2, -8); }
+        else if (mood === 'panic') { ctx.moveTo(-8, -9); ctx.lineTo(-2, -6); ctx.moveTo(8, -9); ctx.lineTo(2, -6); }
+        else { ctx.moveTo(-7, -5); ctx.lineTo(-2, -6); ctx.moveTo(7, -5); ctx.lineTo(2, -6); }
+        ctx.stroke();
+
+        // 目・口（気分で変化）
+        if (mood === 'eating' || mood === 'perfect') {
+            ctx.strokeStyle = 'black'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(-4, -1, 2.6, Math.PI, 0); ctx.stroke();
+            ctx.beginPath(); ctx.arc(4, -1, 2.6, Math.PI, 0); ctx.stroke();
+        } else if (mood === 'soaring') {
+            ctx.fillStyle = 'black';
+            ctx.beginPath(); ctx.arc(-4, -2, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -2, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-5, -3.2, 1.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(3, -3.2, 1.2, 0, Math.PI * 2); ctx.fill();
+        } else if (mood === 'panic') {
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-4, -1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -1, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'black';
+            ctx.beginPath(); ctx.arc(-4, -1, 1.8, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -1, 1.8, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.fillStyle = 'black';
+            const eyeSize = mood === 'charging' ? 2.6 : 2.2;
+            ctx.beginPath(); ctx.arc(-4, -1, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(4, -1, eyeSize, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'white';
+            ctx.beginPath(); ctx.arc(-4.9, -1.9, 0.9, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(3.1, -1.9, 0.9, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ctx.fillStyle = '#7a4a20'; ctx.beginPath(); ctx.ellipse(0, 2.5, 1.6, 1.1, 0, 0, Math.PI * 2); ctx.fill();
+        if (mood === 'panic') {
+            ctx.strokeStyle = 'black'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.ellipse(0, 6.5, 2.4, 3, 0, 0, Math.PI * 2); ctx.stroke();
+        } else if (mood === 'soaring') {
+            ctx.fillStyle = '#5a3a18';
+            ctx.beginPath(); ctx.ellipse(0, 6, 3.4, 3.8, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#c76b6b';
+            ctx.beginPath(); ctx.ellipse(0, 8, 1.8, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+        } else if (mood === 'eating') {
+            ctx.fillStyle = '#5a3a18';
+            ctx.beginPath(); ctx.ellipse(0, 6, 2.6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
+        } else {
+            ctx.strokeStyle = '#5a3a18'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.arc(0, 4, 3, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+        }
+
+        // アクセサリー（都市が進むほど装備が増える＝征服の証）
+        if (accessory >= 1) {
+            ctx.fillStyle = 'rgba(20,20,30,0.85)';
+            ctx.beginPath(); ctx.ellipse(-4, -1, 5.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(4, -1, 5.5, 4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(-1, -1); ctx.lineTo(1, -1); ctx.stroke();
+        }
+        if (accessory >= 2) {
+            ctx.fillStyle = '#c94a3a';
+            ctx.beginPath();
+            ctx.moveTo(-18, -6); ctx.quadraticCurveTo(0, -22, 18, -6);
+            ctx.quadraticCurveTo(0, -14, -18, -6);
+            ctx.fill();
+            ctx.fillStyle = '#e8dede';
+            ctx.beginPath(); ctx.moveTo(17, -9); ctx.lineTo(27, -9); ctx.lineTo(17, -3); ctx.fill();
+        }
+
+        // Perfect演出：頭上のキラキラ
+        if (mood === 'perfect') {
+            ctx.fillStyle = '#ffdd00';
+            for (let i = 0; i < 3; i++) {
+                const sa = tailPhase * 2 + i * 2.1;
+                const sx = Math.cos(sa) * 22, sy = -24 + Math.sin(sa) * 6;
+                ctx.save(); ctx.translate(sx, sy); ctx.rotate(sa);
+                ctx.beginPath();
+                for (let k = 0; k < 4; k++) { ctx.lineTo(3, 0); ctx.rotate(Math.PI / 2); ctx.lineTo(1, 0); ctx.rotate(Math.PI / 2); }
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        // 溜め演出：目の上の集中線
+        if (mood === 'charging') {
+            ctx.strokeStyle = 'rgba(255,221,0,0.8)'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(-22, -18); ctx.lineTo(-16, -14);
+            ctx.moveTo(22, -18); ctx.lineTo(16, -14);
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    // ============ 仲間の群れ ============
+    function chainLinkPos(i) {
+        return i === chainAnchorIndex ? { x: player.x, y: player.y } : chainMemberDisplayPos(i);
+    }
+
+    // 隣り合う猿同士が「しっぽを掴む」数珠つなぎ。各リンクは真っ直ぐではなく、
+    // それぞれ独立にたるみ・揺れを持たせ、一本の棒のように直線に見えないようにする。
+    function drawChainRope() {
+        if (followerCount <= 0) return;
+        ctx.save();
+        ctx.strokeStyle = '#7a4a20'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        for (let i = 0; i < followerCount; i++) {
+            const a = chainLinkPos(i);
+            const b = chainLinkPos(i + 1);
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const perpX = -dy / len, perpY = dx / len;
+            // 常に少したるみ、さらに珠ごとに位相をずらした揺れを加える（数珠のような不揃いな動き）
+            const sag = 8 + Math.sin(Date.now() / 240 + i * 2.1) * 6;
+            const cx = (a.x + b.x) / 2 + perpX * sag;
+            const cy = (a.y + b.y) / 2 + perpY * sag + 6;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.quadraticCurveTo(cx, cy, b.x, b.y);
+            ctx.stroke();
+        }
+        // 珠の結び目（各猿がしっぽ／手で掴んでいる位置）
+        ctx.fillStyle = '#5a3a18';
+        for (let i = 0; i <= followerCount; i++) {
+            const p = chainLinkPos(i);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // アンカー（今ロープ/空中にいる個体）以外を、ロープにぶら下がるポーズで描く
+    function drawHangingChain(accessory) {
+        for (let i = 0; i <= followerCount; i++) {
+            if (i === chainAnchorIndex) continue;
+            const mp = chainLinkPos(i);
+            const hangRot = chainLinkAngle[i] !== undefined ? chainLinkAngle[i] : 0;
+            if (i === 0) {
+                drawMonkey(mp.x, mp.y, hangRot, 'SWINGING', null, { sizeMult: 1, alpha: 1, mood: 'normal', tailPhase: player.tailPhase, accessory });
+            } else {
+                drawMonkey(mp.x, mp.y, hangRot, 'SWINGING', null, { sizeMult: 0.6, alpha: 0.9, mood: 'normal', tailPhase: Date.now() / 180 + i * 1.3 });
+            }
+        }
+    }
+
+    // ============ 人間の追跡者 ============
+    function drawPursuer() {
+        if (!pursuerActive || gameState !== 'PLAYING') return;
+        const px = player.x - chaseGap;
+        const py = GROUND_LEVEL - 30;
+        const viewW = canvas.width / scale;
+        if (px < cameraX - 60 || px > cameraX + viewW + 60) return;
+        const runCycle = Math.sin(Date.now() / 90) * 8;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-3, 10); ctx.lineTo(-3 + runCycle, 22); ctx.moveTo(3, 10); ctx.lineTo(3 - runCycle, 22); ctx.stroke();
+        ctx.fillStyle = '#2b3a67'; ctx.fillRect(-8, -14, 16, 26);
+        ctx.strokeStyle = '#2b3a67'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-14 - runCycle * 0.5, 4); ctx.moveTo(8, -6); ctx.lineTo(14 + runCycle * 0.5, 4); ctx.stroke();
+        ctx.fillStyle = '#f2c49b'; ctx.beginPath(); ctx.arc(0, -20, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1c2540'; ctx.beginPath(); ctx.arc(0, -22, 7.5, Math.PI, 0); ctx.fill(); ctx.fillRect(-2, -23, 10, 3);
+        ctx.restore();
+    }
+
+    function drawTrajectoryPreview() {
+        if (gameState !== 'PLAYING' || player.state !== 'SWINGING') return;
+        const preview = computePreviewTrajectory();
+        if (!preview) return;
+        const colors = { green: '#7CFC00', yellow: '#ffdd00', red: '#ff5050' };
+        const arcH = preview.arcHeightPx;
+        ctx.save();
+        ctx.fillStyle = colors[preview.quality];
+        const steps = 16;
+        for (let i = 1; i <= steps; i++) {
+            const p = i / steps;
+            const px = preview.startX + (preview.targetX - preview.startX) * p;
+            const linearY = preview.startY + (preview.targetY - preview.startY) * p;
+            const py = linearY - arcH * Math.sin(p * Math.PI);
+            ctx.globalAlpha = 0.25 + 0.55 * p;
+            ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath(); ctx.arc(preview.targetX, preview.targetY - arcH * Math.sin(Math.PI), 6, 0, Math.PI * 2);
+        ctx.restore();
+
+        const nextT = trapezes[player.trapezeIndex + 1];
+        if (nextT) {
+            ctx.save();
+            ctx.strokeStyle = colors[preview.quality];
+            ctx.lineWidth = 3; ctx.globalAlpha = 0.7 + Math.sin(Date.now() / 150) * 0.2;
+            ctx.beginPath(); ctx.arc(nextT.barX, nextT.barY, 18, 0, Math.PI * 2); ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); ctx.scale(scale, scale);
+
+        const phaseLength = 5000;
+        const dayProgress = Math.max(0, cameraX) / phaseLength;
+        const phaseIndex = Math.floor(dayProgress) % skyPalettes.length;
+        const nextPhaseIndex = (phaseIndex + 1) % skyPalettes.length;
+        const dt = dayProgress - Math.floor(dayProgress);
+        const topColor = lerpColor(skyPalettes[phaseIndex].top, skyPalettes[nextPhaseIndex].top, dt);
+        const bottomColor = lerpColor(skyPalettes[phaseIndex].bottom, skyPalettes[nextPhaseIndex].bottom, dt);
+        const grad = ctx.createLinearGradient(0, 0, 0, VIRTUAL_HEIGHT);
+        grad.addColorStop(0, rgb(topColor)); grad.addColorStop(1, rgb(bottomColor));
+        ctx.fillStyle = grad; ctx.fillRect(0, 0, canvas.width / scale, VIRTUAL_HEIGHT);
+
+        let starAlpha = 0;
+        if (phaseIndex === 2) starAlpha = dt; else if (phaseIndex === 3) starAlpha = 1.0; else if (phaseIndex === 4) starAlpha = 1.0 - dt;
+        if (starAlpha > 0) {
+            ctx.save(); ctx.fillStyle = `rgba(255,255,255,${starAlpha})`;
+            stars.forEach(s => {
+                let sx = (s.x - cameraX * 0.1) % 2000; if (sx < 0) sx += 2000;
+                const blink = 0.5 + Math.sin(Date.now() / 200 + s.x) * 0.5;
+                ctx.globalAlpha = starAlpha * s.alpha * blink;
+                ctx.beginPath(); ctx.arc(sx, s.y, s.size, 0, Math.PI * 2); ctx.fill();
+            });
+            ctx.restore();
+        }
+
+        drawSilhouetteLayer(cameraX, 260, 0.35, GROUND_LEVEL - 40, 0.55, 0.5);
+        drawSilhouetteLayer(cameraX, 150, 0.6, GROUND_LEVEL, 0.9, 0.85);
+
+        drawGround(cameraX);
+        ctx.save(); ctx.translate(-cameraX, 0);
+
+        drawPursuer();
+        drawCrows();
+
+        bananas.forEach(b => {
+            if (!b.collected && b.x > cameraX - 100 && b.x < cameraX + (canvas.width / scale) + 100) {
+                if (b.type === 'golden') {
+                    const floatY = Math.sin(Date.now() / 150 + b.x) * 15;
+                    ctx.font = '64px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(255,215,0,0.9)'; ctx.shadowBlur = 22;
+                    ctx.fillText('🍌', b.x, b.y + floatY);
+                    ctx.font = '30px Arial'; ctx.shadowBlur = 8;
+                    ctx.fillText('✨', b.x + 32, b.y + floatY - 24); ctx.fillText('✨', b.x - 32, b.y + floatY + 24);
+                    ctx.shadowColor = 'transparent';
+                } else {
+                    const floatY = Math.sin(Date.now() / 200 + b.x) * 10;
+                    ctx.font = '42px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+                    ctx.fillText('🍌', b.x, b.y + floatY);
+                    ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+                }
+            }
+        });
+
+        trapezes.forEach(t => {
+            if (t.broken) return;
+            if (t.pivotX < cameraX - 200 || t.pivotX > cameraX + (canvas.width / scale) + 200) return;
+            drawVine(t);
+            if (t.breakable && t.breakStarted && !t.broken) drawBreakWarning(t);
+        });
+
+        drawTrajectoryPreview();
+
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        trailParticles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); });
+        ctx.restore();
+
+        let drawState = 'SWINGING';
+        let rot = 0;
+        if ((player.state === 'SWINGING' || player.state === 'CATCHING') && trapezes[player.trapezeIndex]) {
+            rot = trapezes[player.trapezeIndex].angleRad; drawState = 'SWINGING';
+        } else if (player.state === 'ROPE_FALLING' || player.state === 'CROW_FALLING') {
+            rot = Math.min(1.4, (player.fallVy || 0) * 0.12); drawState = 'FLYING';
+        } else {
+            const isMovingUp = player.y < player.lastY && player.flightProgress <= 1.0;
+            if (player.hasDoubleJumped && isMovingUp) { rot = player.rollAngle; drawState = 'ROLLING'; }
+            else {
+                let flyAngle = Math.atan2(player.flightTargetY - player.flightStartY, player.flightTargetX - player.flightStartX);
+                if (player.flightProgress > 1.0) flyAngle = Math.PI / 2;
+                rot = flyAngle * 0.5;
+                // 打ち出し直後のごく短い瞬間だけ既存のFLYING（発射）ポーズ、
+                // それ以降は上昇中/下降中でポーズと表情を変える
+                if (player.flightProgress < 0.1) drawState = 'FLYING';
+                else drawState = isMovingUp ? 'FLYING_RISE' : 'FLYING_FALL';
+            }
+        }
+        const isFlyingLike = drawState === 'FLYING' || drawState === 'FLYING_RISE' || drawState === 'FLYING_FALL';
+        const glow = player.combo >= 4 ? '#ff3366' : (player.combo >= 3 ? '#ffdd00' : null);
+        const stageProg = getStageBlend(distanceScore).progress;
+        const accessory = stageProg >= 4.6 ? 2 : (stageProg >= 3.5 ? 1 : 0);
+        drawChainRope();
+        drawHangingChain(accessory);
+        const anchorOpts = chainAnchorIndex === 0
+            ? { scaleX: player.scaleX, scaleY: player.scaleY, mood: player.mood, tailPhase: player.tailPhase, accessory }
+            : { scaleX: player.scaleX, scaleY: player.scaleY, mood: 'normal', tailPhase: player.tailPhase, sizeMult: 0.6, alpha: 0.95 };
+        drawMonkey(player.x, player.y, rot, drawState, isFlyingLike ? glow : null, anchorOpts);
+
+        floatingTexts.forEach(ft => {
+            ctx.globalAlpha = Math.max(0, ft.life);
+            ctx.fillStyle = ft.color;
+            ctx.font = `bold ${ft.size}px 'Arial Rounded MT Bold'`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#000'; ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+            ctx.fillText(ft.text, ft.x, ft.y);
+            ctx.shadowColor = 'transparent'; ctx.globalAlpha = 1.0;
+        });
+
+        ctx.restore();
+
+        if (pursuerActive && chaseGap < 220 && gameState === 'PLAYING') {
+            const t = 1 - Math.max(0, chaseGap) / 220;
+            const pulse = 0.5 + Math.sin(Date.now() / 130) * 0.5;
+            ctx.save();
+            ctx.globalAlpha = t * 0.4 * (0.6 + pulse * 0.4);
+            const vw = canvas.width / scale;
+            const grad = ctx.createLinearGradient(0, 0, vw, 0);
+            grad.addColorStop(0, 'rgba(255,0,0,0.9)'); grad.addColorStop(0.15, 'rgba(255,0,0,0)');
+            grad.addColorStop(0.85, 'rgba(255,0,0,0)'); grad.addColorStop(1, 'rgba(255,0,0,0.9)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, vw, VIRTUAL_HEIGHT);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    function loop() { if (!isPaused) update(); draw(); requestAnimationFrame(loop); }
+
+    function handleInput(e) {
+        if (gameState !== 'PLAYING' || isPaused) return;
+        if (e.target && e.target.closest && (e.target.closest('.screen') || e.target.id === 'mute-btn' || e.target.id === 'pause-btn')) return;
+        if (player.state === 'SWINGING') {
+            const t = trapezes[player.trapezeIndex];
+            const releaseAngleDeg = t.angleDeg;
+            const isPerfect = releaseAngleDeg >= (MAX_SWING_ANGLE * 0.85);
+            playSound(isPerfect ? 'perfect' : 'jump');
+            if (isPerfect) {
+                player.combo++;
+                const tColor = player.combo >= 4 ? '#ff3366' : (player.combo >= 2 ? '#ffdd00' : '#00ffcc');
+                addFloatingText('Perfect!', player.x, player.y - 80, tColor, 38 + player.combo * 2);
+                player.mood = 'perfect'; player.moodTimer = 20;
+            } else {
+                if (player.combo > 0 && releaseAngleDeg > 0) addFloatingText('Combo Break', player.x, player.y - 80, '#ff5555', 22);
+                player.combo = 0;
+            }
+            updateComboUI();
+            player.scaleX = 0.7; player.scaleY = 1.35;
+            const jm = jumpMultipliers();
+            player.arcHeightMult = jm.height;
+            const jumpDistance = (releaseAngleDeg > 0 ? BASE_DISTANCE + (Math.min(releaseAngleDeg / MAX_SWING_ANGLE, 1.0) * BONUS_DISTANCE) : 50) * jm.dist;
+            // 離した瞬間のロープの角度と仲間の重さから、弧の高さ・持ち上がりを決める
+            const arc = computeJumpArc(releaseAngleDeg, jm);
+            player.primaryArcHeight = arc.arcHeight;
+            player.state = 'FLYING'; player.canDoubleJump = true; player.hasDoubleJumped = false;
+            player.launchTrapezeIndex = player.trapezeIndex; // このフライト中、離陸した本人のツルへは再キャッチしない（固まり防止）
+            player.flightStartX = player.x; player.flightStartY = player.y;
+            player.flightTargetX = player.x + jumpDistance; player.flightTargetY = player.y - arc.liftY;
+            player.flightProgress = 0;
+            player.flightSpeed = 0.02 + (150 / Math.max(jumpDistance, 100)) * 0.01;
+        } else if (player.state === 'FLYING' && player.canDoubleJump) {
+            playSound('jump');
+            player.canDoubleJump = false; player.hasDoubleJumped = true;
+            const jm = jumpMultipliers();
+            player.flightStartX = player.x; player.flightStartY = player.y;
+            player.flightTargetX = player.x + DOUBLE_JUMP_DISTANCE * jm.dist; player.flightTargetY = player.y - 60 * jm.height;
+            player.flightProgress = 0; player.flightSpeed = 0.025;
+        } else if (player.state === 'ROPE_FALLING') {
+            // 切れたロープから緊急ジャンプで脱出するチャンス
+            unlockAchievement('close_call');
+            playSound('jump');
+            player.mood = 'normal'; player.moodTimer = 0;
+            const jm = jumpMultipliers();
+            player.arcHeightMult = jm.height;
+            const escArc = computeJumpArc(40, jm); // ロープがないので固定の中程度の打ち出し角を想定
+            player.primaryArcHeight = escArc.arcHeight;
+            player.state = 'FLYING'; player.canDoubleJump = true; player.hasDoubleJumped = false;
+            player.launchTrapezeIndex = player.trapezeIndex;
+            player.flightStartX = player.x; player.flightStartY = player.y;
+            const escapeDist = (BASE_DISTANCE + 60) * jm.dist;
+            player.flightTargetX = player.x + escapeDist; player.flightTargetY = player.y - escArc.liftY;
+            player.flightProgress = 0;
+            player.flightSpeed = 0.02 + (150 / Math.max(escapeDist, 100)) * 0.01;
+        }
+    }
+
+    window.addEventListener('mousedown', handleInput);
+    window.addEventListener('touchstart', handleInput, { passive: false });
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleInput(e); });
+
+    window.shareScore = function(e) {
+        if (e) e.stopPropagation();
+        const text = `Monkey Swing 3 で ${score} 点を獲得！ジャングルから都市まで駆け抜けろ 🐒🏙️`;
+        if (navigator.share) navigator.share({ title: 'ゲーム結果', text, url: window.location.href }).catch(() => {});
+        else navigator.clipboard.writeText(text).then(() => alert('スコアをコピーしました！'));
+    };
+    window.takeScreenshot = function(e) {
+        if (e) e.stopPropagation();
+        try {
+            const link = document.createElement('a');
+            link.download = `monkey_swing3_score_${score}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        } catch (err) { alert('保存に失敗しました。'); }
+    };
+
+    initGameData();
+    updateTitleBest();
+    loop();
+</script>
+</body>
+</html>

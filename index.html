@@ -180,7 +180,7 @@
                     <div style="display:flex; gap:6px; justify-content:center;">
                         <button class="btn btn-small" onclick="selectBgmTrack('default', event)" id="bgm-btn-default" style="padding:7px 12px; font-size:12px;">デフォルト</button>
                         <button class="btn btn-small" onclick="selectBgmTrack('m', event)" id="bgm-btn-m" style="padding:7px 12px; font-size:12px;">カスタムM</button>
-                        <button class="btn btn-small" onclick="selectBgmTrack('f', event)" id="bgm-btn-f" style="padding:7px 12px; font-size:12px;">カスタム女</button>
+                        <button class="btn btn-small" onclick="selectBgmTrack('f', event)" id="bgm-btn-f" style="padding:7px 12px; font-size:12px;">カスタムL</button>
                     </div>
                 </div>
                 <div class="version">グラフィック切替: <a href="index-hd.html" style="color:#9de8ff;">HD版</a> / <a href="index-custom.html" style="color:#9de8ff;">Custom版</a></div>
@@ -356,7 +356,7 @@
     const BGM_REWARD_SCORE = 30000;
     const REWARD_BGM = {
         m: { name: 'カスタムM', src: 'audio-hd/bgm.mp3' },
-        f: { name: 'カスタム女', src: 'audio/bgm.mp3' }
+        f: { name: 'カスタムL', src: 'audio/bgm.mp3' }
     };
     let selectedBgmTrack = 'default';
     let bgmAudio = null, bgmMp3GainNode = null;

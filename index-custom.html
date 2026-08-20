@@ -175,6 +175,7 @@
                 <div id="result-best" class="best-line"></div>
                 <button class="btn" onclick="resetGame(event)">もう一度遊ぶ</button>
                 <button class="btn btn-small" onclick="openAchievements(event)" style="margin-top:8px;">🏆 実績・記録</button>
+                <div class="version">グラフィック切替: <a href="index.html" style="color:#9de8ff;">クラシック版</a> / <a href="index-hd.html" style="color:#9de8ff;">HD版</a></div>
             </div>
 
             <div id="achievementsScreen" class="screen hidden">
@@ -909,6 +910,9 @@
         const badge = document.getElementById('new-best-badge');
         badge.classList.toggle('hidden', !isNewBest);
         document.getElementById('result-best').innerText = `自己ベスト: ${STATS.bestScore}点 / ${STATS.bestDistance}m`;
+
+        // Gravity（投稿サイト）にiframe埋め込みされている場合、親ページへスコアを送信してランキングに反映させる
+        try { window.parent.postMessage({ type: 'gameOver', score }, '*'); } catch (e) {}
     }
 
     // ============ カラス：出現・移動・当たり判定 ============

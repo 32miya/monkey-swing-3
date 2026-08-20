@@ -333,77 +333,34 @@
         updateBGM(progress);
     }
 
-    // ============ BGM（Monkey Swing 2 のBGMを参考に、外部音源を使わず自前で作曲したループ） ============
-    let bgmGain = null, bgmFilter = null, bgmTimer = null;
-    let bgmNextTime = 0, bgmStep = 0;
-    const BGM_BPM = 108;
-    const BGM_STEP_SEC = 60 / BGM_BPM / 2;
-    const BGM_ROOT = 220; // A3
-    // マイナーペンタトニック（ジャングル〜冒険っぽい響き）のシンプルなループ
-    const BGM_LEAD = [0, 3, 5, 7, 10, 7, 5, 3, 0, 3, 7, 10, 12, 10, 7, 3];
-    const BGM_BASS = [0, 0, 5, 5, 3, 3, 7, 7, 0, 0, 5, 5, 3, 3, 7, 7];
-    function bgmNoteFreq(semi) { return BGM_ROOT * Math.pow(2, semi / 12); }
+    // ============ BGM（外部MP3をループ再生。音源自体の音量が大きいため既定で5%に絞る） ============
+    // iOS Safariは HTMLMediaElement.volume の変更を無視する仕様があるため、
+    // audio要素をWeb Audio APIに接続し、GainNodeで音量を制御する（iOSでも確実に効く方式）。
+    const BGM_VOLUME = 0.05;
+    let bgmAudio = null, bgmGainNode = null;
 
     function startBGM() {
-        if (bgmGain) return;
-        bgmFilter = audioCtx.createBiquadFilter();
-        bgmFilter.type = 'lowpass'; bgmFilter.frequency.value = 1600;
-        bgmGain = audioCtx.createGain();
-        bgmGain.gain.value = isMuted ? 0 : 0.09;
-        bgmFilter.connect(bgmGain); bgmGain.connect(audioCtx.destination);
-        bgmNextTime = audioCtx.currentTime + 0.1;
-        bgmStep = 0;
-        scheduleBGM();
-    }
-
-    function scheduleBGM() {
-        while (bgmNextTime < audioCtx.currentTime + 0.2) {
-            playBGMStep(bgmStep, bgmNextTime);
-            bgmNextTime += BGM_STEP_SEC;
-            bgmStep = (bgmStep + 1) % BGM_LEAD.length;
-        }
-        bgmTimer = setTimeout(scheduleBGM, 50);
-    }
-
-    function playBGMStep(step, t) {
-        // リード（メロディ）：軽やかに、1拍おき
-        if (step % 2 === 0) {
-            const lead = audioCtx.createOscillator();
-            const leadGain = audioCtx.createGain();
-            lead.type = 'triangle';
-            lead.frequency.value = bgmNoteFreq(BGM_LEAD[step] + 12);
-            leadGain.gain.setValueAtTime(0, t);
-            leadGain.gain.linearRampToValueAtTime(0.5, t + 0.02);
-            leadGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 1.8);
-            lead.connect(leadGain); leadGain.connect(bgmFilter);
-            lead.start(t); lead.stop(t + BGM_STEP_SEC * 2);
-        }
-        // ベース：土台のリズム、4拍おき
-        if (step % 4 === 0) {
-            const bass = audioCtx.createOscillator();
-            const bassGain = audioCtx.createGain();
-            bass.type = 'sine';
-            bass.frequency.value = bgmNoteFreq(BGM_BASS[step] - 12);
-            bassGain.gain.setValueAtTime(0, t);
-            bassGain.gain.linearRampToValueAtTime(0.6, t + 0.02);
-            bassGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 3.6);
-            bass.connect(bassGain); bassGain.connect(bgmFilter);
-            bass.start(t); bass.stop(t + BGM_STEP_SEC * 4);
-        }
+        if (bgmAudio) return;
+        bgmAudio = new Audio('audio-hd/bgm.mp3');
+        bgmAudio.loop = true;
+        const bgmSource = audioCtx.createMediaElementSource(bgmAudio);
+        bgmGainNode = audioCtx.createGain();
+        bgmGainNode.gain.value = isMuted ? 0 : BGM_VOLUME;
+        bgmSource.connect(bgmGainNode).connect(audioCtx.destination);
+        bgmAudio.play().catch(() => {});
     }
 
     function updateBGM(progress) {
-        if (!bgmFilter) return;
-        // ジャングルは丸く柔らかい音色、都市に進むほど明るく開けた音色へ
-        const targetFreq = 1200 + progress * 1800;
-        bgmFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 2.0);
+        // MP3切り替え後はステージ進行に応じた音色変化は行わない
     }
 
-    // 落下してゲームオーバーになる瞬間、BGM・環境音を止めて「残念な」静けさを演出する
+    // 落下してゲームオーバーになる瞬間、BGMを止めて「残念な」静けさを演出する
     function stopBGM() {
-        if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
-        if (bgmGain) { bgmGain.gain.cancelScheduledValues(audioCtx.currentTime); bgmGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
-        bgmGain = null; bgmFilter = null;
+        if (!bgmAudio) return;
+        bgmAudio.pause();
+        bgmAudio.currentTime = 0;
+        bgmAudio = null;
+        bgmGainNode = null;
     }
     function stopAmbient() {
         if (ambientGain) { ambientGain.gain.cancelScheduledValues(audioCtx.currentTime); ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
@@ -488,7 +445,7 @@
         if (e) e.stopPropagation();
         isMuted = !isMuted;
         if (ambientGain) ambientGain.gain.setTargetAtTime(isMuted ? 0 : 0.025, audioCtx.currentTime, 0.2);
-        if (bgmGain) bgmGain.gain.setTargetAtTime(isMuted ? 0 : 0.09, audioCtx.currentTime, 0.2);
+        if (bgmGainNode) bgmGainNode.gain.setTargetAtTime(isMuted ? 0 : BGM_VOLUME, audioCtx.currentTime, 0.2);
         document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🎵";
     };
 
@@ -498,10 +455,12 @@
         isPaused = !isPaused;
         if (isPaused) {
             audioCtx.suspend();
+            if (bgmAudio) bgmAudio.pause();
             document.getElementById('pauseScreen').classList.remove('hidden');
             document.getElementById('pause-btn').innerText = '▶️';
         } else {
             audioCtx.resume();
+            if (bgmAudio) bgmAudio.play().catch(() => {});
             document.getElementById('pauseScreen').classList.add('hidden');
             document.getElementById('pause-btn').innerText = '⏸️';
         }

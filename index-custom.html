@@ -1483,12 +1483,13 @@
     // ============ MONKEY（ユーザー提供イラストを使用） ============
     // 状態に応じて用意したイラストを選び、手（ロープを掴む点）や体の中心が
     // 原点(0,0)に来るようオフセットして描画する。回転・拡大縮小は今までと同じ仕組みを流用。
-    const BABY_POSES = ['a', 'b', 'c'];
+    // babyArt.b は空中で腕を伸ばすポーズなので、静止してぶら下がっている場面で使うと
+    // 「ずっとジャンプしているように見える」ため、ぶら下がり中は a/c だけを使い回す
+    const BABY_HANG_POSES = ['a', 'c'];
     function pickMonkeyArt(state, mood, opts) {
         if (opts && opts.isBaby) {
-            // ぶら下がっている子猿は数珠つなぎの見た目に変化をつけるため個体ごとにポーズを変える
             if (state !== 'SWINGING') return babyArt.b;
-            const key = BABY_POSES[(opts.babyPoseIndex || 0) % BABY_POSES.length];
+            const key = BABY_HANG_POSES[(opts.babyPoseIndex || 0) % BABY_HANG_POSES.length];
             return babyArt[key];
         }
         if (state === 'SWINGING') return mood === 'perfect' ? monkeyArt.swingA : monkeyArt.swingB;

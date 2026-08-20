@@ -362,14 +362,19 @@
     }
 
     // ============ BGM（外部MP3をループ再生。音源自体の音量が大きいため既定で20%に絞る） ============
+    // iOS Safariは HTMLMediaElement.volume の変更を無視する仕様があるため、
+    // audio要素をWeb Audio APIに接続し、GainNodeで音量を制御する（iOSでも確実に効く方式）。
     const BGM_VOLUME = 0.2;
-    let bgmAudio = null;
+    let bgmAudio = null, bgmGainNode = null;
 
     function startBGM() {
         if (bgmAudio) return;
         bgmAudio = new Audio('audio/bgm.mp3');
         bgmAudio.loop = true;
-        bgmAudio.volume = isMuted ? 0 : BGM_VOLUME;
+        const bgmSource = audioCtx.createMediaElementSource(bgmAudio);
+        bgmGainNode = audioCtx.createGain();
+        bgmGainNode.gain.value = isMuted ? 0 : BGM_VOLUME;
+        bgmSource.connect(bgmGainNode).connect(audioCtx.destination);
         bgmAudio.play().catch(() => {});
     }
 
@@ -383,6 +388,7 @@
         bgmAudio.pause();
         bgmAudio.currentTime = 0;
         bgmAudio = null;
+        bgmGainNode = null;
     }
     function stopAmbient() {
         if (ambientGain) { ambientGain.gain.cancelScheduledValues(audioCtx.currentTime); ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
@@ -467,7 +473,7 @@
         if (e) e.stopPropagation();
         isMuted = !isMuted;
         if (ambientGain) ambientGain.gain.setTargetAtTime(isMuted ? 0 : 0.025, audioCtx.currentTime, 0.2);
-        if (bgmAudio) bgmAudio.volume = isMuted ? 0 : BGM_VOLUME;
+        if (bgmGainNode) bgmGainNode.gain.setTargetAtTime(isMuted ? 0 : BGM_VOLUME, audioCtx.currentTime, 0.2);
         document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🎵";
     };
 

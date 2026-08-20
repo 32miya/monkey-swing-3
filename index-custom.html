@@ -1748,14 +1748,19 @@
                     const floatY = Math.sin(Date.now() / 150 + b.x) * 15;
                     ctx.font = '64px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.shadowColor = 'rgba(255,215,0,0.9)'; ctx.shadowBlur = 22;
+                    ctx.fillStyle = '#FFCC4D';
                     ctx.fillText('🍌', b.x, b.y + floatY);
                     ctx.font = '30px Arial'; ctx.shadowBlur = 8;
+                    ctx.fillStyle = '#FFE680';
                     ctx.fillText('✨', b.x + 32, b.y + floatY - 24); ctx.fillText('✨', b.x - 32, b.y + floatY + 24);
                     ctx.shadowColor = 'transparent';
                 } else {
                     const floatY = Math.sin(Date.now() / 200 + b.x) * 10;
                     ctx.font = '42px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 5; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+                    // emoji用フォントが無い環境だと絵文字が現在のfillStyleで塗りつぶされてしまうため、
+                    // カラス等の描画で黒く残っていたfillStyleを引き継いでバナナが真っ黒になるのを防ぐ
+                    ctx.fillStyle = '#FFCC4D';
                     ctx.fillText('🍌', b.x, b.y + floatY);
                     ctx.shadowColor = 'transparent'; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
                 }

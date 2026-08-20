@@ -369,36 +369,53 @@
         updateBGM(progress);
     }
 
-    // ============ BGM（外部MP3をループ再生。音源自体の音量が大きいため既定で5%に絞る） ============
-    // iOS Safariは HTMLMediaElement.volume の変更を無視する仕様があるため、
-    // audio要素をWeb Audio APIに接続し、GainNodeで音量を制御する（iOSでも確実に効く方式）。
-    const BGM_VOLUME = 0.05;
-    const BGM_REWARD_SCORE = 30000;
+    // ============ BGM（既定は自前生成の音楽。30000点達成でMP3報酬が解禁される） ============
+    let bgmGain = null, bgmFilter = null, bgmTimer = null;
+    let bgmNextTime = 0, bgmStep = 0;
+    const BGM_BPM = 108;
+    const BGM_STEP_SEC = 60 / BGM_BPM / 2;
+    const BGM_ROOT = 220; // A3
+    const BGM_LEAD = [0, 3, 5, 7, 10, 7, 5, 3, 0, 3, 7, 10, 12, 10, 7, 3];
+    const BGM_BASS = [0, 0, 5, 5, 3, 3, 7, 7, 0, 0, 5, 5, 3, 3, 7, 7];
+    function bgmNoteFreq(semi) { return BGM_ROOT * Math.pow(2, semi / 12); }
+
     // ハイスコア30000点達成で、バージョンを問わず選べるようになるBGM報酬（このバージョンの既定曲は「カスタムL」）
+    const BGM_REWARD_SCORE = 30000;
     const REWARD_BGM = {
         m: { name: 'カスタムM', src: 'audio-hd/bgm.mp3' },
         f: { name: 'カスタムL', src: 'audio/bgm.mp3' }
     };
+    const DEFAULT_BGM_SRC = 'audio/bgm.mp3';
     let selectedBgmTrack = 'default';
-    let bgmAudio = null, bgmGainNode = null;
+    let bgmAudio = null, bgmMp3GainNode = null;
 
-    function resolveBgmSrc() {
-        return selectedBgmTrack === 'default' ? 'audio/bgm.mp3' : REWARD_BGM[selectedBgmTrack].src;
+    // 30000点に到達するまでは、このバージョンの既定曲であっても報酬MP3を流さない
+    function startBGM() {
+        const unlocked = STATS.bestScore >= BGM_REWARD_SCORE;
+        if (unlocked) {
+            const src = selectedBgmTrack === 'default' ? DEFAULT_BGM_SRC : REWARD_BGM[selectedBgmTrack].src;
+            startMp3BGM(src);
+            return;
+        }
+        startProceduralBGM();
     }
 
-    function startBGM() {
+    // iOS Safariは HTMLMediaElement.volume の変更を無視する仕様があるため、
+    // audio要素をWeb Audio APIに接続し、GainNodeで音量を制御する（iOSでも確実に効く方式）。
+    function startMp3BGM(src) {
         if (bgmAudio) return;
-        bgmAudio = new Audio(resolveBgmSrc());
+        bgmAudio = new Audio(src);
         bgmAudio.loop = true;
         const bgmSource = audioCtx.createMediaElementSource(bgmAudio);
-        bgmGainNode = audioCtx.createGain();
-        bgmGainNode.gain.value = isMuted ? 0 : BGM_VOLUME;
-        bgmSource.connect(bgmGainNode).connect(audioCtx.destination);
+        bgmMp3GainNode = audioCtx.createGain();
+        bgmMp3GainNode.gain.value = isMuted ? 0 : 0.05;
+        bgmSource.connect(bgmMp3GainNode).connect(audioCtx.destination);
         bgmAudio.play().catch(() => {});
     }
 
     window.selectBgmTrack = function (key, e) {
         if (e) e.stopPropagation();
+        if (STATS.bestScore < BGM_REWARD_SCORE) return;
         selectedBgmTrack = key;
         updateBgmSelectUI();
         stopBGM();
@@ -412,17 +429,64 @@
         });
     }
 
+    function startProceduralBGM() {
+        if (bgmGain) return;
+        bgmFilter = audioCtx.createBiquadFilter();
+        bgmFilter.type = 'lowpass'; bgmFilter.frequency.value = 1600;
+        bgmGain = audioCtx.createGain();
+        bgmGain.gain.value = isMuted ? 0 : 0.09;
+        bgmFilter.connect(bgmGain); bgmGain.connect(audioCtx.destination);
+        bgmNextTime = audioCtx.currentTime + 0.1;
+        bgmStep = 0;
+        scheduleBGM();
+    }
+
+    function scheduleBGM() {
+        while (bgmNextTime < audioCtx.currentTime + 0.2) {
+            playBGMStep(bgmStep, bgmNextTime);
+            bgmNextTime += BGM_STEP_SEC;
+            bgmStep = (bgmStep + 1) % BGM_LEAD.length;
+        }
+        bgmTimer = setTimeout(scheduleBGM, 50);
+    }
+
+    function playBGMStep(step, t) {
+        if (step % 2 === 0) {
+            const lead = audioCtx.createOscillator();
+            const leadGain = audioCtx.createGain();
+            lead.type = 'triangle';
+            lead.frequency.value = bgmNoteFreq(BGM_LEAD[step] + 12);
+            leadGain.gain.setValueAtTime(0, t);
+            leadGain.gain.linearRampToValueAtTime(0.5, t + 0.02);
+            leadGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 1.8);
+            lead.connect(leadGain); leadGain.connect(bgmFilter);
+            lead.start(t); lead.stop(t + BGM_STEP_SEC * 2);
+        }
+        if (step % 4 === 0) {
+            const bass = audioCtx.createOscillator();
+            const bassGain = audioCtx.createGain();
+            bass.type = 'sine';
+            bass.frequency.value = bgmNoteFreq(BGM_BASS[step] - 12);
+            bassGain.gain.setValueAtTime(0, t);
+            bassGain.gain.linearRampToValueAtTime(0.6, t + 0.02);
+            bassGain.gain.exponentialRampToValueAtTime(0.0008, t + BGM_STEP_SEC * 3.6);
+            bass.connect(bassGain); bassGain.connect(bgmFilter);
+            bass.start(t); bass.stop(t + BGM_STEP_SEC * 4);
+        }
+    }
+
     function updateBGM(progress) {
-        // MP3切り替え後はステージ進行に応じた音色変化は行わない
+        if (!bgmFilter) return;
+        const targetFreq = 1200 + progress * 1800;
+        bgmFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 2.0);
     }
 
     // 落下してゲームオーバーになる瞬間、BGMを止めて「残念な」静けさを演出する
     function stopBGM() {
-        if (!bgmAudio) return;
-        bgmAudio.pause();
-        bgmAudio.currentTime = 0;
-        bgmAudio = null;
-        bgmGainNode = null;
+        if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+        if (bgmGain) { bgmGain.gain.cancelScheduledValues(audioCtx.currentTime); bgmGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
+        bgmGain = null; bgmFilter = null;
+        if (bgmAudio) { bgmAudio.pause(); bgmAudio.currentTime = 0; bgmAudio = null; bgmMp3GainNode = null; }
     }
     function stopAmbient() {
         if (ambientGain) { ambientGain.gain.cancelScheduledValues(audioCtx.currentTime); ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.12); }
@@ -507,7 +571,8 @@
         if (e) e.stopPropagation();
         isMuted = !isMuted;
         if (ambientGain) ambientGain.gain.setTargetAtTime(isMuted ? 0 : 0.025, audioCtx.currentTime, 0.2);
-        if (bgmGainNode) bgmGainNode.gain.setTargetAtTime(isMuted ? 0 : BGM_VOLUME, audioCtx.currentTime, 0.2);
+        if (bgmGain) bgmGain.gain.setTargetAtTime(isMuted ? 0 : 0.09, audioCtx.currentTime, 0.2);
+        if (bgmMp3GainNode) bgmMp3GainNode.gain.setTargetAtTime(isMuted ? 0 : 0.05, audioCtx.currentTime, 0.2);
         document.getElementById('mute-btn').innerText = isMuted ? "🔇" : "🎵";
     };
 

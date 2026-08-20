@@ -361,8 +361,10 @@
     let selectedBgmTrack = 'default';
     let bgmAudio = null, bgmMp3GainNode = null;
 
+    // 30000点に到達するまでは、報酬MP3を流さない
     function startBGM() {
-        if (selectedBgmTrack !== 'default') { startMp3BGM(REWARD_BGM[selectedBgmTrack].src); return; }
+        const unlocked = STATS.bestScore >= BGM_REWARD_SCORE;
+        if (unlocked && selectedBgmTrack !== 'default') { startMp3BGM(REWARD_BGM[selectedBgmTrack].src); return; }
         startProceduralBGM();
     }
 
@@ -379,6 +381,7 @@
 
     window.selectBgmTrack = function (key, e) {
         if (e) e.stopPropagation();
+        if (STATS.bestScore < BGM_REWARD_SCORE) return;
         selectedBgmTrack = key;
         updateBgmSelectUI();
         stopBGM();

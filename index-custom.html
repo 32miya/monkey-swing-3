@@ -364,7 +364,7 @@
     // ============ BGM（外部MP3をループ再生。音源自体の音量が大きいため既定で20%に絞る） ============
     // iOS Safariは HTMLMediaElement.volume の変更を無視する仕様があるため、
     // audio要素をWeb Audio APIに接続し、GainNodeで音量を制御する（iOSでも確実に効く方式）。
-    const BGM_VOLUME = 0.2;
+    const BGM_VOLUME = 0.1;
     let bgmAudio = null, bgmGainNode = null;
 
     function startBGM() {

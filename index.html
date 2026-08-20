@@ -688,12 +688,13 @@
 
     function chainMultiplier() { return Math.min(followerCount + 1, 5); }
 
+    // ジブリ的な、少しくすんで奥行きのある空気感の空色パレット（原色すぎる空を避ける）
     const skyPalettes = [
-        { top: [135, 206, 235], bottom: [224, 255, 255] },
-        { top: [255, 126, 95],  bottom: [254, 180, 123] },
-        { top: [43, 88, 118],   bottom: [78, 67, 118] },
-        { top: [2, 1, 17],      bottom: [32, 28, 41] },
-        { top: [116, 116, 191], bottom: [52, 138, 199] }
+        { top: [92, 156, 168],  bottom: [214, 232, 196] },
+        { top: [216, 118, 78],  bottom: [244, 189, 128] },
+        { top: [51, 74, 97],    bottom: [98, 79, 110] },
+        { top: [8, 10, 26],     bottom: [30, 32, 48] },
+        { top: [98, 108, 158],  bottom: [201, 176, 168] }
     ];
 
     for (let i = 0; i < 100; i++) stars.push({ x: Math.random() * 2000, y: Math.random() * VIRTUAL_HEIGHT * 0.8, size: Math.random() * 2, alpha: Math.random() });
@@ -1204,12 +1205,17 @@
             if (isBuilding) {
                 const h = (60 + hash1(s * 3.3) * 220) * sizeScale;
                 const w = (30 + hash1(s * 5.7) * 46) * sizeScale;
-                const grey = 40 + hash1(s * 9.1) * 40;
-                ctx.fillStyle = `rgb(${grey},${grey},${grey + 8})`;
+                // 無機質な灰色ではなく、経年した石や木の温かみのある色調に（もののけ姫のタタラ場を意識）
+                const warmth = hash1(s * 9.1);
+                const r = 58 + warmth * 40, g = 46 + warmth * 34, b = 38 + warmth * 26;
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
                 ctx.fillRect(drawX - w / 2, baseY - h, w, h);
+                // 屋根の庇（板葺き屋根のような簡素なキャップ）
+                ctx.fillStyle = `rgb(${r * 0.7},${g * 0.65},${b * 0.6})`;
+                ctx.fillRect(drawX - w / 2 - 3 * sizeScale, baseY - h, w + 6 * sizeScale, 6 * sizeScale);
                 const slot = getSilhouetteSlot(s, true, h, w, progress);
                 if (slot.windows.length) {
-                    ctx.fillStyle = 'rgba(255,215,80,0.5)';
+                    ctx.fillStyle = 'rgba(255,190,90,0.55)';
                     for (const [wx, wy] of slot.windows) ctx.fillRect(drawX + wx, baseY - h + wy, 4, 6);
                 }
                 if (slot.hasFlag) {
@@ -1219,15 +1225,20 @@
                 }
             } else {
                 const h = (50 + hash1(s * 4.4) * 70) * sizeScale;
-                const green = 60 + hash1(s * 2.2) * 50;
-                ctx.fillStyle = `rgb(20,${green + 30},30)`;
-                ctx.fillRect(drawX - 4 * sizeScale, baseY - h * 0.4, 8 * sizeScale, h * 0.4);
-                ctx.fillStyle = `rgb(15,${green},20)`;
+                // 苔むした深い森の色調（単純な緑ではなく、青みがかった深緑〜オリーブの揺らぎ）
+                const mossT = hash1(s * 2.2);
+                const canR = 22 + mossT * 18, canG = 62 + mossT * 46, canB = 40 + mossT * 30;
+                ctx.fillStyle = `rgb(${canR * 0.6},${canG * 0.55},${canB * 0.55})`;
+                ctx.fillRect(drawX - 4 * sizeScale, baseY - h * 0.42, 8 * sizeScale, h * 0.42);
+                ctx.fillStyle = `rgb(${canR},${canG},${canB})`;
                 ctx.beginPath();
-                ctx.arc(drawX, baseY - h * 0.4, h * 0.42, 0, Math.PI * 2);
-                ctx.arc(drawX - h * 0.22, baseY - h * 0.28, h * 0.3, 0, Math.PI * 2);
-                ctx.arc(drawX + h * 0.22, baseY - h * 0.3, h * 0.32, 0, Math.PI * 2);
+                ctx.arc(drawX, baseY - h * 0.42, h * 0.44, 0, Math.PI * 2);
+                ctx.arc(drawX - h * 0.24, baseY - h * 0.3, h * 0.3, 0, Math.PI * 2);
+                ctx.arc(drawX + h * 0.22, baseY - h * 0.32, h * 0.33, 0, Math.PI * 2);
                 ctx.fill();
+                // 木漏れ日のハイライト（片側だけ少し明るくして立体感と幻想的な光を出す）
+                ctx.fillStyle = `rgba(${Math.min(255, canR + 90)},${Math.min(255, canG + 70)},${Math.min(255, canB + 40)},0.3)`;
+                ctx.beginPath(); ctx.arc(drawX - h * 0.14, baseY - h * 0.58, h * 0.2, 0, Math.PI * 2); ctx.fill();
             }
             ctx.globalAlpha = 1.0;
         }
@@ -1236,10 +1247,10 @@
     function drawGround(camX) {
         const info = getStageBlend(distanceScore);
         const groundPalettes = [
-            [26, 60, 20], [40, 60, 22], [64, 52, 34], [70, 70, 74], [36, 36, 40], [46, 38, 30]
+            [24, 54, 24], [46, 58, 26], [62, 50, 34], [58, 56, 58], [34, 32, 38], [50, 40, 30]
         ];
         const edgePalettes = [
-            [34, 130, 34], [60, 120, 40], [110, 90, 40], [180, 180, 60], [230, 200, 60], [230, 170, 40]
+            [58, 118, 46], [96, 122, 54], [120, 92, 48], [150, 140, 90], [176, 150, 110], [214, 160, 70]
         ];
         const gCol = lerpColor(groundPalettes[info.idx], groundPalettes[Math.min(info.idx + 1, groundPalettes.length - 1)], info.t);
         const eCol = lerpColor(edgePalettes[info.idx], edgePalettes[Math.min(info.idx + 1, edgePalettes.length - 1)], info.t);

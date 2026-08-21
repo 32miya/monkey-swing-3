@@ -775,9 +775,25 @@
         let nextY = TRAPEZE_PIVOT_Y;
         let prevMaxSwingBackX = startT.pivotX + startT.length * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
         let safeMargin = 60;
+        let minLength = 200;
+
+        // 仲間を連れていると（特にV字構成でjm.dist=0.5の時）実際に出せるジャンプ距離が大幅に落ちる。
+        // ここで間隔をランダムに決めた直後、現在の連結状態で理論上絶対に届かない間隔にならないよう上限を設ける。
+        // ロープの長さは後段でランダムに決まるため、最悪ケース（最短ロープ＝最も届きにくい）を基準に計算する。
+        // これをしないと、仲間の数や隊列の位置によっては、どんなタイミングで跳んでも届かない間隔が
+        // 生成されてしまい、プレイヤーの操作に関係なく必ず落下するケースが発生していた。
+        const jmDistSafe = followerCount > 0 ? Math.min(jumpMultipliers().dist, 0.5) : 1.0;
+        const singleJumpReach = (BASE_DISTANCE + BONUS_DISTANCE) * jmDistSafe;
+        const doubleJumpReach = singleJumpReach + DOUBLE_JUMP_DISTANCE * jmDistSafe;
+        const maxReach = isLongJump ? doubleJumpReach : singleJumpReach;
+        const maxJumpX = prevMaxSwingBackX + maxReach + minLength * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD) + 20;
+        if (nextX > maxJumpX) {
+            nextX = maxJumpX;
+            spacing = nextX - startT.pivotX;
+        }
+
         let maxAllowedLength = (nextX - prevMaxSwingBackX - safeMargin) / Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD);
         maxAllowedLength = Math.min(maxAllowedLength, 600);
-        let minLength = 200;
         if (maxAllowedLength < minLength) {
             maxAllowedLength = minLength;
             nextX = prevMaxSwingBackX + safeMargin + (minLength * Math.sin(MAX_SWING_ANGLE * DEG_TO_RAD));
